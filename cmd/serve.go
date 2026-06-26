@@ -62,8 +62,6 @@ func startServer(port string) (int, error) {
 	}
 
 	pid := cmd.Process.Pid
-	// Release so it doesn't become zombie
-	cmd.Process.Release()
 
 	// Save PID
 	os.MkdirAll(filepath.Dir(pidFile()), 0755)
@@ -79,12 +77,14 @@ func stopServer() error {
 	}
 
 	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return fmt.Errorf("process %d not found", pid)
-	}
 
-	proc.Kill()
+	// Kill the server process (SIGTERM for graceful shutdown)
+	exec.Command("kill", strconv.Itoa(pid)).Run()
+
+	// Wait briefly, then force if still alive
+	time.Sleep(2 * time.Second)
+	exec.Command("kill", "-9", strconv.Itoa(pid)).Run()
+
 	os.Remove(pidFile())
 	return nil
 }
