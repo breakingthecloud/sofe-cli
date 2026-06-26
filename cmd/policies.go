@@ -60,6 +60,7 @@ var healthCmd = &cobra.Command{
 }
 
 func init() {
+	policiesCmd.Flags().StringVarP(&policiesDir, "policies", "p", "", "Policies directory")
 	rootCmd.AddCommand(policiesCmd)
 	rootCmd.AddCommand(healthCmd)
 }
