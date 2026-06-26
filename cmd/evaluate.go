@@ -14,6 +14,7 @@ var (
 	profile       string
 	failOn        string
 	resourceTypes []string
+	autoServe     bool
 )
 
 var evaluateCmd = &cobra.Command{
@@ -28,6 +29,18 @@ var evaluateCmd = &cobra.Command{
 		if prof == "" {
 			prof = cfg.AWSProfile
 		}
+
+		// Auto-serve: start server if not running
+		shouldStop := false
+		if autoServe {
+			shouldStop = AutoServe(cfg.APIURL)
+		}
+		defer func() {
+			if shouldStop {
+				fmt.Println("\n⏹ Stopping auto-started server...")
+				stopServer()
+			}
+		}()
 
 		fmt.Printf("📋 Evaluating policies from: %s\n", dir)
 
@@ -72,5 +85,6 @@ func init() {
 	evaluateCmd.Flags().StringVar(&profile, "profile", "", "AWS profile")
 	evaluateCmd.Flags().StringVar(&failOn, "fail-on", "", "Fail if findings at/above severity (critical|high|medium|low)")
 	evaluateCmd.Flags().StringSliceVar(&resourceTypes, "resource-types", nil, "Filter resource types")
+	evaluateCmd.Flags().BoolVar(&autoServe, "auto-serve", false, "Auto-start server if not running (stops after evaluation)")
 	rootCmd.AddCommand(evaluateCmd)
 }
