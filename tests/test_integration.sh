@@ -81,6 +81,22 @@ $SOFE --help | grep -q "evaluate"
 check "help shows evaluate command" $?
 $SOFE evaluate --help | grep -q "fail-on"
 check "evaluate help shows --fail-on flag" $?
+$SOFE --help | grep -q "serve"
+check "help shows serve command" $?
+$SOFE evaluate --help | grep -q "auto-serve"
+check "evaluate help shows --auto-serve flag" $?
+
+# Test 9: sofe serve (requires sofe-server installed)
+echo "9. Serve commands"
+$SOFE serve --help | grep -q "Stop with"
+# Note: actual serve/stop tests should be run manually to avoid
+# killing processes that may affect the terminal session.
+# Manual test:
+#   ./sofe serve         → ✅ SOFE Server running on :8080 (PID xxx)
+#   ./sofe health        → ✅ SOFE Server 0.1.0 (ok)
+#   ./sofe serve stop    → ✅ Server stopped
+#   ./sofe evaluate -p ./policies --auto-serve → starts, evaluates, stops
+check "serve --help available" $?
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
