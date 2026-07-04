@@ -1,230 +1,113 @@
-# ⚡ SOFE CLI
+# SOFE CLI
 
-**Fast Go binary for evaluating FinOps policies via the SOFE API.**
-
-The SOFE CLI is a lightweight client that calls [sofe-server](https://github.com/breakingthecloud/sofe-server) to evaluate policies against live AWS infrastructure. Configure it to point at a local server or at `api.sofe.dev` for the hosted tier.
-
-```bash
-sofe evaluate --policies ./policies --profile production
-```
-
-```
-☁️  46 resources scanned | ⚡ 12 findings
-
-  SEVERITY │ POLICY              │ RESOURCE        │ MESSAGE
------------+---------------------+-----------------+---------------------------
-  🟠 high  │ no-idle-ec2         │ i-0abc123def    │ avg_cpu = 2.1% (<5%)
-  🟡 medium│ require-cost-tags   │ my-bucket       │ missing: owner
-  🔵 low   │ s3-require-env-tag  │ logs-bucket     │ missing: Environment
-
-Summary: 12 findings | Potential savings: $365.00/mo
-```
-
----
+> Command-line interface for the SOFE Open FinOps Engine. Evaluate cloud cost policies locally or via the cloud API.
 
 ## Install
 
-### Binary (download)
-
 ```bash
-# macOS (Apple Silicon)
-curl -L https://github.com/breakingthecloud/sofe-cli/releases/latest/download/sofe-darwin-arm64 -o sofe
-chmod +x sofe && sudo mv sofe /usr/local/bin/
+# Quick install (macOS/Linux)
+curl -fsSL https://sofe.dev/install.sh | bash
 
-# Linux (amd64)
-curl -L https://github.com/breakingthecloud/sofe-cli/releases/latest/download/sofe-linux-amd64 -o sofe
-chmod +x sofe && sudo mv sofe /usr/local/bin/
-```
-
-### Homebrew (coming soon)
-
-```bash
-brew install breakingthecloud/tap/sofe
-```
-
-### From source
-
-```bash
+# Go install
 go install github.com/breakingthecloud/sofe-cli@latest
+
+# Or download binary from GitHub Releases
+# https://github.com/breakingthecloud/sofe-cli/releases
 ```
 
----
+## Quick Start
 
-## Prerequisites
-
-The CLI requires a running [sofe-server](https://github.com/breakingthecloud/sofe-server):
+### Local Mode (self-hosted, no account needed)
 
 ```bash
-# Option 1: pip
-pip install sofe-server && sofe-server
+# Start the local evaluation server
+sofe serve
 
-# Option 2: Docker
-docker run -p 8080:8080 -v ~/.aws:/root/.aws:ro ghcr.io/breakingthecloud/sofe-server
+# Evaluate policies against your AWS account
+sofe evaluate --profile default --policies ./policies/
+
+# With auto-start server
+sofe evaluate --auto-serve --profile default
 ```
 
----
+### Cloud Mode (uses api.sofe.dev)
+
+```bash
+# Set your API key (get one at platform.sofe.dev)
+sofe config set api-key sk_sofe_your_key_here
+
+# Evaluate via cloud
+sofe evaluate --cloud
+
+# Or pass key directly
+sofe evaluate --cloud --api-key sk_sofe_xxx
+```
 
 ## Configuration
 
-Create `~/.sofe/config.yaml`:
+```bash
+# Show current config
+sofe config show
 
-```yaml
-# Local development (no API key)
-api_url: http://localhost:8080
-api_key: ""
-default_format: table
-aws_profile: default
-policies_dir: ./policies
+# Set values
+sofe config set mode cloud          # default to cloud mode
+sofe config set api-key sk_sofe_xxx # persist API key
+sofe config set profile my-profile  # AWS profile for local mode
+sofe config set format json         # output format (table|json|markdown)
 ```
 
-```yaml
-# Hosted tier (api.sofe.dev)
-api_url: https://api.sofe.dev
-api_key: sk-your-api-key-here
-default_format: table
-aws_profile: production
-policies_dir: ./policies
-```
+Config stored at `~/.sofe/config.yaml` (permissions 0600).
 
-If no config file exists, defaults to `http://localhost:8080` with no API key.
-
----
+Environment variables (override config):
+- `SOFE_API_KEY` — API key for cloud mode
+- `SOFE_CLOUD_URL` — custom cloud URL (default: https://api.sofe.dev)
 
 ## Commands
 
-### `sofe evaluate`
+| Command | Description |
+|---------|-------------|
+| `sofe evaluate` | Run policies against AWS resources |
+| `sofe serve` | Start local evaluation server (port 8080) |
+| `sofe policies` | List available policies |
+| `sofe config set` | Set configuration value |
+| `sofe config show` | Show current configuration |
 
-Evaluate policies against live AWS resources.
+## Evaluate Flags
 
-```bash
-sofe evaluate --policies ./policies --profile production
-sofe evaluate -p ./policies --format json
-sofe evaluate -p ./policies --fail-on high          # exit 1 if high+ findings
-sofe evaluate -p ./policies --resource-types aws.ec2,aws.s3
-```
+| Flag | Description |
+|------|-------------|
+| `--cloud` | Use cloud API instead of local server |
+| `--api-key` | API key for cloud mode |
+| `--profile` | AWS profile (local mode) |
+| `--policies` | Policies directory |
+| `--fail-on` | Exit 1 if findings at/above severity (critical\|high\|medium\|low) |
+| `--resource-types` | Filter resource types (comma-separated) |
+| `--auto-serve` | Auto-start local server if not running |
+| `--format` | Output format (table\|json\|markdown) |
 
-| Flag | Short | Description |
-|------|:-----:|-------------|
-| `--policies` | `-p` | Policies directory |
-| `--profile` | | AWS profile name |
-| `--format` | | Output: table, json, markdown |
-| `--fail-on` | | Exit 1 if findings ≥ severity |
-| `--resource-types` | | Filter resource types (comma-separated) |
-
-### `sofe health`
-
-Check if sofe-server is running.
-
-```bash
-sofe health
-# ✅ SOFE Server 0.1.0 (ok)
-```
-
-### `sofe policies`
-
-List loaded policies from the server.
+## CI/CD
 
 ```bash
-sofe policies
+# Block deploys with critical findings
+sofe evaluate --cloud --api-key $SOFE_API_KEY --fail-on high
 ```
 
-```
-  NAME                       │ SEVERITY │ RESOURCE TYPES              │ METRIC
------------------------------+----------+-----------------------------+----------------------
-  no-idle-ec2                │ high     │ aws.ec2                     │ avg_cpu_utilization
-  require-cost-tags          │ medium   │ aws.ec2, aws.s3, aws.lambda │ has_tag:owner
-  no-unattached-ebs          │ medium   │ aws.ebs                     │ attached
-  s3-require-environment-tag │ low      │ aws.s3                      │ has_tag:Environment
+## Local vs Cloud
 
-4 policies loaded
-```
+| | Local | Cloud |
+|--|-------|-------|
+| Needs | sofe-server running locally | API key from platform.sofe.dev |
+| Auth | None (localhost) | X-API-Key header |
+| AWS access | Your local credentials | Connected account (IAM role) |
+| Rate limit | None | 10/day (free), 1000/day (pro) |
+| History | None | Stored in platform |
 
----
+## Links
 
-## Output Formats
-
-### Table (default)
-
-Colored terminal output with severity icons.
-
-### JSON
-
-```bash
-sofe evaluate -p ./policies --format json > findings.json
-```
-
-Full structured response for automation and CI/CD pipelines.
-
-### Markdown
-
-```bash
-sofe evaluate -p ./policies --format markdown >> report.md
-```
-
-Markdown table for PR comments and documentation.
-
----
-
-## CI/CD Integration
-
-### GitHub Actions
-
-```yaml
-- name: FinOps Policy Check
-  run: |
-    curl -L https://github.com/breakingthecloud/sofe-cli/releases/latest/download/sofe-linux-amd64 -o sofe
-    chmod +x sofe
-    ./sofe evaluate --policies ./policies --fail-on high --format json > findings.json
-```
-
-### Exit Codes
-
-| Code | Meaning |
-|:----:|---------|
-| 0 | No violations (or below `--fail-on` threshold) |
-| 1 | Violations found at or above `--fail-on` severity |
-
----
-
-## Architecture
-
-```
-┌──────────────┐         ┌──────────────────┐         ┌─────────────┐
-│  sofe (Go)   │──HTTP──▶│  sofe-server     │──boto3──▶│  AWS APIs   │
-│              │         │  (FastAPI :8080)  │         │             │
-│  ~/.sofe/    │         │                  │         │ EC2, S3,    │
-│  config.yaml │         │  imports sofe    │         │ Lambda, RDS │
-└──────────────┘         └──────────────────┘         └─────────────┘
-```
-
----
-
-## Cross-Compile Targets
-
-| OS | Arch | Binary |
-|----|------|--------|
-| macOS | arm64 | `sofe-darwin-arm64` (12MB) |
-| Linux | amd64 | `sofe-linux-amd64` (12MB) |
-| Linux | arm64 | `sofe-linux-arm64` (11MB) |
-
-Build all:
-
-```bash
-GOOS=darwin GOARCH=arm64 go build -o dist/sofe-darwin-arm64 .
-GOOS=linux GOARCH=amd64 go build -o dist/sofe-linux-amd64 .
-GOOS=linux GOARCH=arm64 go build -o dist/sofe-linux-arm64 .
-```
-
----
-
-## Related
-
-- [sofe](https://github.com/breakingthecloud/sofe) — Engine library + Python CLI (`pip install sofe`)
-- [sofe-server](https://github.com/breakingthecloud/sofe-server) — FastAPI REST API
-- [sofe-catalog](https://github.com/breakingthecloud/sofe-catalog) — Browse policies, collectors, coverage
-- [PyPI](https://pypi.org/project/sofe/) — Python package
-
----
+- **Engine:** [github.com/breakingthecloud/sofe](https://github.com/breakingthecloud/sofe) (Python, Apache 2.0)
+- **Platform:** [platform.sofe.dev](https://platform.sofe.dev) (sign up, API keys)
+- **Docs:** [sofe.dev/docs](https://sofe.dev/docs)
+- **PyPI:** [pypi.org/project/sofe](https://pypi.org/project/sofe)
 
 ## License
 
