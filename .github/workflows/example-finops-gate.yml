@@ -1,0 +1,24 @@
+name: FinOps Gate (Example)
+
+# This workflow shows how to use the SOFE GitHub Action
+# to evaluate your AWS account on every push/PR
+
+on:
+  workflow_dispatch: # manual trigger for testing
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: breakingthecloud/sofe-action@v1
+        id: sofe
+        with:
+          api-key: ${{ secrets.SOFE_API_KEY }}
+          fail-on: high
+          format: table
+
+      - name: Summary
+        run: |
+          echo "## SOFE Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Findings: ${{ steps.sofe.outputs.findings-count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Resources: ${{ steps.sofe.outputs.resources-scanned }}" >> $GITHUB_STEP_SUMMARY
