@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fatih/color"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -44,6 +45,11 @@ var (
 
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241"))
+
+	menuBoxStyle = lipgloss.NewStyle().
+			Padding(1, 2).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("10"))
 )
 
 type interactiveFinding struct {
@@ -60,9 +66,13 @@ type tuiModel struct {
 	findings     []interactiveFinding
 	cursor       int
 	evalID       string
-	view         string // "list" or "detail"
+	evalDate     string
+	evalTrigger  string
+	view         string // "menu", "list", "detail"
+	menuCursor   int
 	explanation  string
 	explainErr   string
+	explaining   bool
 	width        int
 	height       int
 }
@@ -72,12 +82,15 @@ type explainMsg struct {
 	err  error
 }
 
-func initialModel(evalID string, findings []interactiveFinding) tuiModel {
+func initialModel(evalID, evalDate, trigger string, findings []interactiveFinding) tuiModel {
 	return tuiModel{
-		findings: findings,
-		cursor:   0,
-		evalID:   evalID,
-		view:     "list",
+		findings:    findings,
+		cursor:      0,
+		evalID:      evalID,
+		evalDate:    evalDate,
+		evalTrigger: trigger,
+		view:        "menu",
+		menuCursor:  0,
 	}
 }
 
@@ -97,30 +110,50 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "up", "k":
-			if m.view == "list" && m.cursor > 0 {
+			if m.view == "menu" && m.menuCursor > 0 {
+				m.menuCursor--
+			} else if m.view == "list" && m.cursor > 0 {
 				m.cursor--
 			}
 		case "down", "j":
-			if m.view == "list" && m.cursor < len(m.findings)-1 {
+			if m.view == "menu" && m.menuCursor < 2 {
+				m.menuCursor++
+			} else if m.view == "list" && m.cursor < len(m.findings)-1 {
 				m.cursor++
 			}
 		case "enter":
-			if m.view == "list" {
+			if m.view == "menu" {
+				switch m.menuCursor {
+				case 0: // Browse findings
+					m.view = "list"
+				case 1: // Summary
+					// stay on menu, show summary inline (already visible)
+				case 2: // Quit
+					return m, tea.Quit
+				}
+			} else if m.view == "list" {
 				m.view = "detail"
 				m.explanation = ""
 				m.explainErr = ""
+				m.explaining = false
 			}
 		case "esc", "backspace":
 			if m.view == "detail" {
 				m.view = "list"
+				m.explanation = ""
+				m.explainErr = ""
+			} else if m.view == "list" {
+				m.view = "menu"
 			}
 		case "e":
-			if m.view == "detail" {
+			if m.view == "detail" && !m.explaining {
+				m.explaining = true
 				return m, m.callExplain()
 			}
 		}
 
 	case explainMsg:
+		m.explaining = false
 		if msg.err != nil {
 			m.explainErr = msg.err.Error()
 		} else {
@@ -162,21 +195,79 @@ func (m tuiModel) callExplain() tea.Cmd {
 }
 
 func (m tuiModel) View() string {
-	if m.view == "detail" {
+	switch m.view {
+	case "menu":
+		return m.menuView()
+	case "detail":
 		return m.detailView()
+	default:
+		return m.listView()
 	}
-	return m.listView()
+}
+
+func (m tuiModel) menuView() string {
+	var b strings.Builder
+
+	b.WriteString(titleStyle.Render("🔍 SOFE Interactive"))
+	b.WriteString("\n\n")
+
+	// Evaluation summary
+	summary := fmt.Sprintf(
+		"  Evaluation:  %s\n  Trigger:     %s\n  Findings:    %d\n  ID:          %s",
+		m.evalDate, m.evalTrigger, len(m.findings), m.evalID[:8]+"...",
+	)
+	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(summary))
+	b.WriteString("\n\n")
+
+	// Menu items
+	menuItems := []string{
+		fmt.Sprintf("Browse findings (%d)", len(m.findings)),
+		"View severity breakdown",
+		"Quit",
+	}
+
+	for i, item := range menuItems {
+		if i == m.menuCursor {
+			b.WriteString(selectedStyle.Render("▸ " + item))
+		} else {
+			b.WriteString(normalStyle.Render("  " + item))
+		}
+		b.WriteString("\n")
+	}
+
+	// Show severity breakdown inline if selected
+	if m.menuCursor == 1 {
+		b.WriteString("\n")
+		high, med, low := 0, 0, 0
+		for _, f := range m.findings {
+			switch strings.ToLower(f.Severity) {
+			case "high", "critical":
+				high++
+			case "medium":
+				med++
+			default:
+				low++
+			}
+		}
+		breakdown := fmt.Sprintf("  🔴 High: %d  🟡 Medium: %d  🟢 Low: %d", high, med, low)
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Render(breakdown))
+	}
+
+	b.WriteString("\n\n")
+	b.WriteString(helpStyle.Render("↑/↓ select • enter confirm • q quit"))
+
+	return b.String()
 }
 
 func (m tuiModel) listView() string {
 	var b strings.Builder
 
-	b.WriteString(titleStyle.Render(fmt.Sprintf("🔍 SOFE Interactive — %d findings", len(m.findings))))
+	b.WriteString(titleStyle.Render(fmt.Sprintf("🔍 Findings — %d total", len(m.findings))))
 	b.WriteString("\n\n")
 
 	maxShow := m.height - 6
 	if maxShow < 5 {
-		maxShow = 10
+		maxShow = 15
 	}
 	start := 0
 	if m.cursor >= maxShow {
@@ -197,7 +288,7 @@ func (m tuiModel) listView() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("↑/↓ navigate • enter detail • q quit"))
+	b.WriteString(helpStyle.Render("↑/↓ navigate • enter detail • esc menu • q quit"))
 
 	return b.String()
 }
@@ -218,13 +309,18 @@ func (m tuiModel) detailView() string {
 	if len(f.RemediationCommands) > 0 {
 		detail += "\n\nRemediation:"
 		for i, cmd := range f.RemediationCommands {
-			detail += fmt.Sprintf("\n  %d. %s", i+1, cmd)
+			if cmd != "" {
+				detail += fmt.Sprintf("\n  %d. %s", i+1, cmd)
+			}
 		}
 	}
 
 	b.WriteString(detailStyle.Render(detail))
 
-	if m.explanation != "" {
+	if m.explaining {
+		b.WriteString("\n\n")
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("⏳ Calling AI..."))
+	} else if m.explanation != "" {
 		b.WriteString("\n\n")
 		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14")).Render("🤖 AI Explanation:"))
 		b.WriteString("\n")
@@ -236,7 +332,7 @@ func (m tuiModel) detailView() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(helpStyle.Render("e explain • esc back • q quit"))
+	b.WriteString(helpStyle.Render("e explain (AI) • esc back • q quit"))
 
 	return b.String()
 }
@@ -265,8 +361,22 @@ var interactiveCmd = &cobra.Command{
 	Long:  "Launches a terminal UI to navigate findings, view details, and get AI explanations.",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		// Non-TTY detection
+		if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
+			color.Yellow("⚠️  sofe interactive requires a terminal (TTY).")
+			fmt.Println("  Use 'sofe history' to list evaluations or")
+			fmt.Println("  'sofe explain <eval-id> -f <idx>' for AI explanations.")
+			return
+		}
+
+		// API key check — don't force upgrade, just inform
 		if cfg.APIKey == "" {
-			color.Red("❌ No API key configured. Run 'sofe upgrade' first.")
+			color.Yellow("⚠️  No API key configured.")
+			fmt.Println()
+			fmt.Println("  Set your key:  sofe config set api-key sk_sofe_xxx")
+			fmt.Println("  Or run:        sofe upgrade")
+			fmt.Println()
+			fmt.Println("  Get a free key at: platform.sofe.dev/keys")
 			return
 		}
 
@@ -299,7 +409,9 @@ var interactiveCmd = &cobra.Command{
 		}
 
 		var evalResp struct {
-			Findings []interactiveFinding `json:"findings"`
+			Findings  []interactiveFinding `json:"findings"`
+			Timestamp string               `json:"timestamp"`
+			Trigger   string               `json:"trigger"`
 		}
 		json.Unmarshal(data, &evalResp)
 
@@ -308,8 +420,17 @@ var interactiveCmd = &cobra.Command{
 			return
 		}
 
-		// Launch TUI
-		p := tea.NewProgram(initialModel(evalID, evalResp.Findings), tea.WithAltScreen())
+		trigger := evalResp.Trigger
+		if trigger == "" {
+			trigger = "manual"
+		}
+		evalDate := evalResp.Timestamp
+		if len(evalDate) > 16 {
+			evalDate = evalDate[:16] // trim to "2026-07-09T06:00"
+		}
+
+		// Launch TUI with menu
+		p := tea.NewProgram(initialModel(evalID, evalDate, trigger, evalResp.Findings), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error running TUI: %v\n", err)
 			os.Exit(1)

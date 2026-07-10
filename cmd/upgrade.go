@@ -29,7 +29,7 @@ var upgradeCmd = &cobra.Command{
 			fmt.Println("Opening pricing page in your browser...")
 			openBrowser("https://platform.sofe.dev/pricing?source=cli")
 			fmt.Println()
-			fmt.Println("Complete payment there. Your tier upgrades automatically via webhook.")
+			fmt.Println("Complete payment there. Your tier upgrades automatically.")
 			fmt.Println("Run 'sofe status' to verify your new tier.")
 			return
 		}
@@ -37,13 +37,13 @@ var upgradeCmd = &cobra.Command{
 		// Upgrade from self-hosted to Cloud
 		green.Println("🚀 Upgrade to SOFE Cloud (free tier available)")
 		fmt.Println()
-		fmt.Println("Opening signup page in your browser...")
-		openBrowser("https://platform.sofe.dev/signup?source=cli")
+		fmt.Println("Opening platform in your browser...")
+		openBrowser("https://platform.sofe.dev?source=cli")
 		fmt.Println()
-		fmt.Println("After signing up:")
+		fmt.Println("After signing in:")
 		fmt.Println("  1. Go to platform.sofe.dev/keys")
 		fmt.Println("  2. Create an API key")
-		fmt.Println("  3. Paste it below")
+		fmt.Println("  3. Paste it below (or run: sofe config set api-key <key>)")
 		fmt.Println()
 
 		cyan.Print("API Key: ")
