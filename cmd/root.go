@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	cfg    *config.Config
-	apiClient *client.Client
+	cfg        *config.Config
+	apiClient  *client.Client
 	formatFlag string
+	Version    string
 )
 
 var rootCmd = &cobra.Command{
@@ -26,6 +27,7 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
+	rootCmd.Version = Version
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

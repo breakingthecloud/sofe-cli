@@ -94,6 +94,16 @@ func (c *Client) do(method, path string, body interface{}) ([]byte, error) {
 	return data, nil
 }
 
+// Get performs a GET request to the given path and returns raw bytes
+func (c *Client) Get(path string) ([]byte, error) {
+	return c.do("GET", path, nil)
+}
+
+// Post performs a POST request with the given body and returns raw bytes
+func (c *Client) Post(path string, body interface{}) ([]byte, error) {
+	return c.do("POST", path, body)
+}
+
 func (c *Client) Health() (*HealthResponse, error) {
 	data, err := c.do("GET", "/health", nil)
 	if err != nil {

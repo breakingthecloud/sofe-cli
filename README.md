@@ -69,8 +69,62 @@ Environment variables (override config):
 | `sofe evaluate` | Run policies against AWS resources |
 | `sofe serve` | Start local evaluation server (port 8080) |
 | `sofe policies` | List available policies |
+| `sofe history` | List past evaluations (cloud mode) |
+| `sofe status` | Show account status (tier, evals, AI usage) |
+| `sofe explain` | AI explanation for a specific finding |
+| `sofe remediate` | Show/execute remediation CLI commands |
+| `sofe interactive` | TUI to browse findings interactively |
+| `sofe upgrade` | Connect to SOFE Cloud or upgrade to Pro |
+| `sofe terraform` | Scan Terraform plans (coming soon) |
 | `sofe config set` | Set configuration value |
 | `sofe config show` | Show current configuration |
+
+## New in v0.3.0
+
+### Interactive TUI
+
+```bash
+# Browse findings with keyboard navigation
+sofe interactive
+
+# Or specify an evaluation
+sofe interactive abc123-eval-id
+```
+
+Navigate with ↑/↓, press Enter for details, `e` for AI explanation, `q` to quit.
+
+### AI Explain & Remediate
+
+```bash
+# Get AI explanation for finding #2
+sofe explain abc123-eval-id --finding 2
+
+# Show remediation commands
+sofe remediate abc123-eval-id --finding 2
+
+# Execute remediation interactively (confirms each command)
+sofe remediate abc123-eval-id --finding 2 --execute
+```
+
+### Upgrade & Status
+
+```bash
+# Connect CLI to SOFE Cloud (saves API key)
+sofe upgrade
+
+# Upgrade to Pro tier (opens billing)
+sofe upgrade pro
+
+# Check your status
+sofe status
+```
+
+### History
+
+```bash
+# See your last 15 evaluations
+sofe history
+```
 
 ## Evaluate Flags
 
