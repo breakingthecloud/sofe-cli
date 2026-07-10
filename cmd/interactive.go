@@ -17,8 +17,7 @@ import (
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("10")).
-			Padding(0, 1)
+			Foreground(lipgloss.Color("10"))
 
 	selectedStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -28,28 +27,45 @@ var (
 	normalStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("252"))
 
-	severityHighStyle = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color("9"))
+	sevHighStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("9"))
 
-	severityMediumStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("11"))
+	sevMedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("11"))
 
-	severityLowStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("10"))
+	sevLowStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("10"))
 
-	detailStyle = lipgloss.NewStyle().
-			Padding(1, 2).
+	panelBorder = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62"))
+			BorderForeground(lipgloss.Color("238"))
 
-	helpStyle = lipgloss.NewStyle().
+	panelBorderActive = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("34"))
+
+	panelTitle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("10"))
+
+	detailLabel = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245"))
+
+	detailValue = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("252"))
+
+	helpBarStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241"))
 
-	menuBoxStyle = lipgloss.NewStyle().
-			Padding(1, 2).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("10"))
+	headerStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("15")).
+			Background(lipgloss.Color("234")).
+			Padding(0, 1)
+
+	filterStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("14"))
 )
 
 type interactiveFinding struct {
@@ -63,18 +79,20 @@ type interactiveFinding struct {
 }
 
 type tuiModel struct {
-	findings     []interactiveFinding
-	cursor       int
-	evalID       string
-	evalDate     string
-	evalTrigger  string
-	view         string // "menu", "list", "detail"
-	menuCursor   int
-	explanation  string
-	explainErr   string
-	explaining   bool
-	width        int
-	height       int
+	findings      []interactiveFinding
+	filtered      []int // indices into findings (after filter)
+	cursor        int
+	evalID        string
+	evalDate      string
+	evalTrigger   string
+	focus         string // "list" or "detail"
+	filter        string
+	filterMode    bool
+	explanation   string
+	explainErr    string
+	explaining    bool
+	width         int
+	height        int
 }
 
 type explainMsg struct {
@@ -82,15 +100,19 @@ type explainMsg struct {
 	err  error
 }
 
-func initialModel(evalID, evalDate, trigger string, findings []interactiveFinding) tuiModel {
+func initialSplitModel(evalID, evalDate, trigger string, findings []interactiveFinding) tuiModel {
+	indices := make([]int, len(findings))
+	for i := range findings {
+		indices[i] = i
+	}
 	return tuiModel{
 		findings:    findings,
+		filtered:    indices,
 		cursor:      0,
 		evalID:      evalID,
 		evalDate:    evalDate,
 		evalTrigger: trigger,
-		view:        "menu",
-		menuCursor:  0,
+		focus:       "list",
 	}
 }
 
@@ -106,49 +128,69 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Filter mode input
+		if m.filterMode {
+			switch msg.String() {
+			case "enter":
+				m.filterMode = false
+				m.applyFilter()
+			case "esc":
+				m.filterMode = false
+				m.filter = ""
+				m.applyFilter()
+			case "backspace":
+				if len(m.filter) > 0 {
+					m.filter = m.filter[:len(m.filter)-1]
+					m.applyFilter()
+				}
+			default:
+				if len(msg.String()) == 1 {
+					m.filter += msg.String()
+					m.applyFilter()
+				}
+			}
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "up", "k":
-			if m.view == "menu" && m.menuCursor > 0 {
-				m.menuCursor--
-			} else if m.view == "list" && m.cursor > 0 {
+			if m.cursor > 0 {
 				m.cursor--
+				m.explanation = ""
+				m.explainErr = ""
 			}
 		case "down", "j":
-			if m.view == "menu" && m.menuCursor < 3 {
-				m.menuCursor++
-			} else if m.view == "list" && m.cursor < len(m.findings)-1 {
+			if m.cursor < len(m.filtered)-1 {
 				m.cursor++
-			}
-		case "enter":
-			if m.view == "menu" {
-				switch m.menuCursor {
-				case 0: // Browse findings
-					m.view = "list"
-				case 1: // Severity breakdown (inline, no action needed)
-				case 2: // Account status (inline, no action needed)
-				case 3: // Quit
-					return m, tea.Quit
-				}
-			} else if m.view == "list" {
-				m.view = "detail"
 				m.explanation = ""
 				m.explainErr = ""
-				m.explaining = false
 			}
-		case "esc", "backspace":
-			if m.view == "detail" {
-				m.view = "list"
-				m.explanation = ""
-				m.explainErr = ""
-			} else if m.view == "list" {
-				m.view = "menu"
+		case "g":
+			m.cursor = 0
+			m.explanation = ""
+		case "G":
+			m.cursor = len(m.filtered) - 1
+			m.explanation = ""
+		case "tab":
+			if m.focus == "list" {
+				m.focus = "detail"
+			} else {
+				m.focus = "list"
 			}
+		case "/":
+			m.filterMode = true
+			m.filter = ""
 		case "e":
-			if m.view == "detail" && !m.explaining {
+			if !m.explaining && len(m.filtered) > 0 {
 				m.explaining = true
 				return m, m.callExplain()
+			}
+		case "esc":
+			if m.filter != "" {
+				m.filter = ""
+				m.applyFilter()
 			}
 		}
 
@@ -164,14 +206,40 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *tuiModel) applyFilter() {
+	if m.filter == "" {
+		m.filtered = make([]int, len(m.findings))
+		for i := range m.findings {
+			m.filtered[i] = i
+		}
+	} else {
+		m.filtered = nil
+		q := strings.ToLower(m.filter)
+		for i, f := range m.findings {
+			if strings.Contains(strings.ToLower(f.PolicyName), q) ||
+				strings.Contains(strings.ToLower(f.ResourceID), q) ||
+				strings.Contains(strings.ToLower(f.Severity), q) ||
+				strings.Contains(strings.ToLower(f.ResourceType), q) {
+				m.filtered = append(m.filtered, i)
+			}
+		}
+	}
+	if m.cursor >= len(m.filtered) {
+		m.cursor = max(0, len(m.filtered)-1)
+	}
+}
+
 func (m tuiModel) callExplain() tea.Cmd {
 	return func() tea.Msg {
+		if len(m.filtered) == 0 {
+			return explainMsg{err: fmt.Errorf("no finding selected")}
+		}
 		aiClient := getAIClient()
-		finding := m.findings[m.cursor]
+		finding := m.findings[m.filtered[m.cursor]]
 
 		reqBody := map[string]interface{}{
 			"evaluation_id": m.evalID,
-			"finding_index": m.cursor,
+			"finding_index": m.filtered[m.cursor],
 			"finding": map[string]string{
 				"policy_name":   finding.PolicyName,
 				"severity":      finding.Severity,
@@ -195,212 +263,231 @@ func (m tuiModel) callExplain() tea.Cmd {
 }
 
 func (m tuiModel) View() string {
-	switch m.view {
-	case "menu":
-		return m.menuView()
-	case "detail":
-		return m.detailView()
-	default:
-		return m.listView()
+	if m.width == 0 {
+		return "Loading..."
 	}
+	return m.splitView()
 }
 
-func (m tuiModel) menuView() string {
-	var b strings.Builder
+func (m tuiModel) splitView() string {
+	// Layout: header + [left panel | right panel] + help bar
+	totalW := m.width
+	leftW := totalW * 40 / 100
+	rightW := totalW - leftW - 4 // borders + padding
 
-	b.WriteString(titleStyle.Render("SOFE Interactive"))
-	b.WriteString("\n\n")
-
-	// Evaluation summary
-	summary := fmt.Sprintf(
-		"  Evaluation:  %s\n  Trigger:     %s\n  Findings:    %d\n  ID:          %s",
-		m.evalDate, m.evalTrigger, len(m.findings), m.evalID[:8]+"...",
-	)
-	b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(summary))
-	b.WriteString("\n\n")
-
-	// Menu items
-	menuItems := []string{
-		fmt.Sprintf("Browse findings (%d)", len(m.findings)),
-		"View severity breakdown",
-		"Account status",
-		"Quit",
+	if leftW < 30 {
+		leftW = 30
+	}
+	if rightW < 30 {
+		rightW = 30
 	}
 
-	for i, item := range menuItems {
-		if i == m.menuCursor {
-			b.WriteString(selectedStyle.Render("▸ " + item))
-		} else {
-			b.WriteString(normalStyle.Render("  " + item))
-		}
-		b.WriteString("\n")
+	// Header bar
+	headerText := fmt.Sprintf(" SOFE Interactive │ %s │ %d findings │ %s",
+		m.evalDate, len(m.findings), m.evalTrigger)
+	if m.filter != "" {
+		headerText += fmt.Sprintf(" │ filter: %s (%d matches)", m.filter, len(m.filtered))
+	}
+	header := headerStyle.Width(totalW).Render(headerText)
+
+	// Left panel: findings list
+	leftContent := m.renderFindingsList(leftW-4, m.height-6)
+	leftBorder := panelBorder
+	if m.focus == "list" {
+		leftBorder = panelBorderActive
+	}
+	leftPanel := leftBorder.Width(leftW).Height(m.height - 5).Render(leftContent)
+
+	// Right panel: detail + AI
+	rightContent := m.renderDetailPanel(rightW-4, m.height-6)
+	rightBorder := panelBorder
+	if m.focus == "detail" {
+		rightBorder = panelBorderActive
+	}
+	rightPanel := rightBorder.Width(rightW).Height(m.height - 5).Render(rightContent)
+
+	// Compose
+	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
+
+	// Help bar
+	help := helpBarStyle.Render(" ↑↓/jk navigate • e explain • / filter • tab panel • gg/G jump • q quit")
+	if m.filterMode {
+		help = filterStyle.Render(fmt.Sprintf(" Filter: %s█ (enter confirm, esc cancel)", m.filter))
 	}
 
-	// Show inline content based on selection
-	if m.menuCursor == 1 {
-		b.WriteString("\n")
-		high, med, low := 0, 0, 0
-		for _, f := range m.findings {
-			switch strings.ToLower(f.Severity) {
-			case "high", "critical":
-				high++
-			case "medium":
-				med++
-			default:
-				low++
-			}
-		}
-		breakdown := fmt.Sprintf("  HIGH: %d  |  MEDIUM: %d  |  LOW: %d", high, med, low)
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Render(breakdown))
-
-		// Top policies
-		policyCount := map[string]int{}
-		for _, f := range m.findings {
-			policyCount[f.PolicyName]++
-		}
-		b.WriteString("\n\n")
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("  Top policies:"))
-		b.WriteString("\n")
-		shown := 0
-		for policy, count := range policyCount {
-			if shown >= 5 {
-				break
-			}
-			b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(fmt.Sprintf("    %s (%d)", policy, count)))
-			b.WriteString("\n")
-			shown++
-		}
-	} else if m.menuCursor == 2 {
-		b.WriteString("\n")
-		statusInfo := fmt.Sprintf("  Mode:     cloud\n  API Key:  %s...%s\n  Findings: %d in latest eval",
-			cfg.APIKey[:12], cfg.APIKey[len(cfg.APIKey)-4:], len(m.findings))
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Render(statusInfo))
-	}
-
-	b.WriteString("\n\n")
-	b.WriteString(helpStyle.Render("↑/↓ select • enter confirm • q quit"))
-
-	return b.String()
+	return header + "\n" + panels + "\n" + help
 }
 
-func (m tuiModel) listView() string {
+func (m tuiModel) renderFindingsList(w, h int) string {
 	var b strings.Builder
 
-	b.WriteString(titleStyle.Render(fmt.Sprintf("Findings — %d total", len(m.findings))))
+	b.WriteString(panelTitle.Render("FINDINGS"))
+	b.WriteString(detailLabel.Render(fmt.Sprintf(" %d/%d", m.cursor+1, len(m.filtered))))
 	b.WriteString("\n\n")
 
-	maxShow := m.height - 6
+	maxShow := h - 3
 	if maxShow < 5 {
-		maxShow = 15
+		maxShow = 10
 	}
+
 	start := 0
 	if m.cursor >= maxShow {
 		start = m.cursor - maxShow + 1
 	}
 
-	for i := start; i < len(m.findings) && i < start+maxShow; i++ {
-		f := m.findings[i]
-		sevBadge := severityBadge(f.Severity)
-		line := fmt.Sprintf(" %s  %-25s %s", sevBadge, truncate(f.ResourceID, 25), f.PolicyName)
+	for i := start; i < len(m.filtered) && i < start+maxShow; i++ {
+		f := m.findings[m.filtered[i]]
+		sev := sevBadge(f.Severity)
+		resource := truncStr(f.ResourceID, 20)
+		policy := truncStr(f.PolicyName, w-30)
+
+		line := fmt.Sprintf("%s %s %s", sev, resource, detailLabel.Render(policy))
 
 		if i == m.cursor {
-			b.WriteString(selectedStyle.Render("▸ " + line))
+			b.WriteString(selectedStyle.Render("▸" + line))
 		} else {
-			b.WriteString(normalStyle.Render("  " + line))
+			b.WriteString(normalStyle.Render(" " + line))
 		}
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("↑/↓ navigate • enter detail • esc menu • q quit"))
-
 	return b.String()
 }
 
-func (m tuiModel) detailView() string {
-	f := m.findings[m.cursor]
+func (m tuiModel) renderDetailPanel(w, h int) string {
+	if len(m.filtered) == 0 {
+		return detailLabel.Render("No findings match filter")
+	}
+
+	f := m.findings[m.filtered[m.cursor]]
 	var b strings.Builder
 
-	header := fmt.Sprintf("Finding #%d — %s", m.cursor, f.PolicyName)
-	b.WriteString(titleStyle.Render(header))
+	b.WriteString(panelTitle.Render("DETAIL"))
 	b.WriteString("\n\n")
 
-	detail := fmt.Sprintf(
-		"Severity:  %s\nResource:  %s\nType:      %s\nRegion:    %s\n\nMessage:\n  %s",
-		f.Severity, f.ResourceID, f.ResourceType, f.Region, f.Message,
-	)
+	b.WriteString(detailLabel.Render("Policy:    ") + detailValue.Render(f.PolicyName) + "\n")
+	b.WriteString(detailLabel.Render("Severity:  ") + sevColor(f.Severity) + "\n")
+	b.WriteString(detailLabel.Render("Resource:  ") + detailValue.Render(f.ResourceID) + "\n")
+	b.WriteString(detailLabel.Render("Type:      ") + detailValue.Render(f.ResourceType) + "\n")
+	b.WriteString(detailLabel.Render("Region:    ") + detailValue.Render(f.Region) + "\n")
+	b.WriteString("\n")
+	b.WriteString(detailLabel.Render("Message:") + "\n")
+	b.WriteString(detailValue.Render("  " + f.Message) + "\n")
 
+	// Remediation
 	if len(f.RemediationCommands) > 0 {
-		detail += "\n\nRemediation:"
-		for i, cmd := range f.RemediationCommands {
-			if cmd != "" {
-				detail += fmt.Sprintf("\n  %d. %s", i+1, cmd)
+		hasCmd := false
+		for _, c := range f.RemediationCommands {
+			if c != "" {
+				hasCmd = true
+				break
+			}
+		}
+		if hasCmd {
+			b.WriteString("\n")
+			b.WriteString(detailLabel.Render("Remediation:") + "\n")
+			for _, cmd := range f.RemediationCommands {
+				if cmd != "" {
+					b.WriteString(detailValue.Render("  $ " + cmd) + "\n")
+				}
 			}
 		}
 	}
 
-	b.WriteString(detailStyle.Render(detail))
+	// AI section
+	b.WriteString("\n")
+	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("238")).Render("────────────────────────────") + "\n")
 
 	if m.explaining {
-		b.WriteString("\n\n")
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("⏳ Calling AI..."))
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("⏳ Calling AI...") + "\n")
 	} else if m.explanation != "" {
-		b.WriteString("\n\n")
-		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14")).Render("🤖 AI Explanation:"))
-		b.WriteString("\n")
-		b.WriteString(m.explanation)
+		b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14")).Render("AI Explanation") + "\n\n")
+		// Truncate explanation to fit panel
+		lines := strings.Split(m.explanation, "\n")
+		maxLines := h - 16
+		if maxLines < 4 {
+			maxLines = 4
+		}
+		for i, line := range lines {
+			if i >= maxLines {
+				b.WriteString(detailLabel.Render("  ... (scroll with tab+↓)") + "\n")
+				break
+			}
+			b.WriteString(detailValue.Render(wrapLine(line, w-2)) + "\n")
+		}
+	} else if m.explainErr != "" {
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("Error: " + m.explainErr) + "\n")
+	} else {
+		b.WriteString(detailLabel.Render("Press 'e' for AI explanation") + "\n")
 	}
-	if m.explainErr != "" {
-		b.WriteString("\n\n")
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("❌ " + m.explainErr))
-	}
-
-	b.WriteString("\n\n")
-	b.WriteString(helpStyle.Render("e explain (AI) • esc back • q quit"))
 
 	return b.String()
 }
 
-func severityBadge(sev string) string {
+func sevBadge(sev string) string {
 	switch strings.ToLower(sev) {
 	case "high", "critical":
-		return severityHighStyle.Render("HIGH")
+		return sevHighStyle.Render("●")
 	case "medium":
-		return severityMediumStyle.Render(" MED")
+		return sevMedStyle.Render("○")
 	default:
-		return severityLowStyle.Render(" LOW")
+		return sevLowStyle.Render("○")
 	}
 }
 
-func truncate(s string, max int) string {
+func sevColor(sev string) string {
+	switch strings.ToLower(sev) {
+	case "high", "critical":
+		return sevHighStyle.Render(sev)
+	case "medium":
+		return sevMedStyle.Render(sev)
+	default:
+		return sevLowStyle.Render(sev)
+	}
+}
+
+func truncStr(s string, max int) string {
 	if len(s) <= max {
 		return s + strings.Repeat(" ", max-len(s))
 	}
-	return s[:max-3] + "..."
+	return s[:max-2] + ".."
+}
+
+func wrapLine(s string, w int) string {
+	if len(s) <= w {
+		return s
+	}
+	return s[:w]
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 var interactiveCmd = &cobra.Command{
 	Use:   "interactive [eval-id]",
 	Short: "Interactive TUI to browse findings",
-	Long:  "Launches a terminal UI to navigate findings, view details, and get AI explanations.",
+	Long:  "Launches a split-panel terminal UI: findings list + detail + AI explanation.",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		// Non-TTY detection
 		if !isatty.IsTerminal(os.Stdout.Fd()) && !isatty.IsCygwinTerminal(os.Stdout.Fd()) {
-			color.Yellow("⚠️  sofe interactive requires a terminal (TTY).")
+			color.Yellow("sofe interactive requires a terminal (TTY).")
 			fmt.Println("  Use 'sofe history' to list evaluations or")
 			fmt.Println("  'sofe explain <eval-id> -f <idx>' for AI explanations.")
 			return
 		}
 
-		// API key check — don't force upgrade, just inform
+		// API key check
 		if cfg.APIKey == "" {
-			color.Yellow("⚠️  No API key configured.")
+			color.Yellow("No API key configured.")
 			fmt.Println()
 			fmt.Println("  Set your key:  sofe config set api-key sk_sofe_xxx")
 			fmt.Println("  Or run:        sofe upgrade")
-			fmt.Println()
-			fmt.Println("  Get a free key at: platform.sofe.dev/keys")
+			fmt.Println("  Get a free key: platform.sofe.dev/keys")
 			return
 		}
 
@@ -410,10 +497,9 @@ var interactiveCmd = &cobra.Command{
 		if len(args) > 0 {
 			evalID = args[0]
 		} else {
-			// Get latest evaluation
 			data, err := cloudClient.Get("/evaluations?limit=1")
 			if err != nil {
-				color.Red("❌ %s", err)
+				color.Red("Error: %s", err)
 				return
 			}
 			var hist HistoryResponse
@@ -425,10 +511,10 @@ var interactiveCmd = &cobra.Command{
 			evalID = hist.Evaluations[0].ID
 		}
 
-		// Fetch evaluation findings
+		// Fetch evaluation
 		data, err := cloudClient.Get("/evaluations/" + evalID)
 		if err != nil {
-			color.Red("❌ %s", err)
+			color.Red("Error: %s", err)
 			return
 		}
 
@@ -440,7 +526,7 @@ var interactiveCmd = &cobra.Command{
 		json.Unmarshal(data, &evalResp)
 
 		if len(evalResp.Findings) == 0 {
-			color.Green("✅ No findings in evaluation %s — your infrastructure looks great!", evalID)
+			color.Green("No findings — your infrastructure looks great!")
 			return
 		}
 
@@ -450,13 +536,16 @@ var interactiveCmd = &cobra.Command{
 		}
 		evalDate := evalResp.Timestamp
 		if len(evalDate) > 16 {
-			evalDate = evalDate[:16] // trim to "2026-07-09T06:00"
+			evalDate = evalDate[:16]
 		}
 
-		// Launch TUI with menu
-		p := tea.NewProgram(initialModel(evalID, evalDate, trigger, evalResp.Findings), tea.WithAltScreen())
+		// Launch split-panel TUI
+		p := tea.NewProgram(
+			initialSplitModel(evalID, evalDate, trigger, evalResp.Findings),
+			tea.WithAltScreen(),
+		)
 		if _, err := p.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error running TUI: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	},
