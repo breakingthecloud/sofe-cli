@@ -86,11 +86,14 @@ type tuiModel struct {
 	evalDate      string
 	evalTrigger   string
 	focus         string // "list" or "detail"
+	view          string // "menu" or "split"
+	menuCursor    int
 	filter        string
 	filterMode    bool
 	explanation   string
 	explainErr    string
 	explaining    bool
+	updateMsg     string
 	width         int
 	height        int
 }
@@ -105,6 +108,10 @@ func initialSplitModel(evalID, evalDate, trigger string, findings []interactiveF
 	for i := range findings {
 		indices[i] = i
 	}
+
+	// Check for update (non-blocking, from cache)
+	updateMsg := checkForUpdate()
+
 	return tuiModel{
 		findings:    findings,
 		filtered:    indices,
@@ -112,7 +119,9 @@ func initialSplitModel(evalID, evalDate, trigger string, findings []interactiveF
 		evalID:      evalID,
 		evalDate:    evalDate,
 		evalTrigger: trigger,
+		view:        "menu",
 		focus:       "list",
+		updateMsg:   updateMsg,
 	}
 }
 
@@ -128,6 +137,39 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		// Menu view
+		if m.view == "menu" {
+			switch msg.String() {
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			case "up", "k":
+				if m.menuCursor > 0 {
+					m.menuCursor--
+				}
+			case "down", "j":
+				if m.menuCursor < 5 {
+					m.menuCursor++
+				}
+			case "enter":
+				switch m.menuCursor {
+				case 0: // Browse findings
+					m.view = "split"
+				case 1: // Top findings
+					m.view = "split"
+					// sort by severity (high first)
+				case 2: // History (exit TUI, suggest command)
+					return m, tea.Quit
+				case 3: // Watch (exit TUI, suggest command)
+					return m, tea.Quit
+				case 4: // Status (exit TUI, suggest command)
+					return m, tea.Quit
+				case 5: // Quit
+					return m, tea.Quit
+				}
+			}
+			return m, nil
+		}
+
 		// Filter mode input
 		if m.filterMode {
 			switch msg.String() {
@@ -152,6 +194,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Split view keys
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -191,6 +234,8 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.filter != "" {
 				m.filter = ""
 				m.applyFilter()
+			} else {
+				m.view = "menu"
 			}
 		}
 
@@ -266,7 +311,75 @@ func (m tuiModel) View() string {
 	if m.width == 0 {
 		return "Loading..."
 	}
+	if m.view == "menu" {
+		return m.menuView()
+	}
 	return m.splitView()
+}
+
+func (m tuiModel) menuView() string {
+	var b strings.Builder
+
+	// Header
+	header := headerStyle.Width(m.width).Render(
+		fmt.Sprintf(" SOFE Interactive │ v%s │ %s │ %d findings", Version, m.evalDate, len(m.findings)))
+	b.WriteString(header)
+	b.WriteString("\n\n")
+
+	// Evaluation context
+	ctx := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	b.WriteString(ctx.Render(fmt.Sprintf("  Evaluation: %s (%s)", m.evalID[:8]+"...", m.evalTrigger)))
+	b.WriteString("\n")
+
+	// Severity summary
+	high, med, low := 0, 0, 0
+	for _, f := range m.findings {
+		switch strings.ToLower(f.Severity) {
+		case "high", "critical":
+			high++
+		case "medium":
+			med++
+		default:
+			low++
+		}
+	}
+	b.WriteString(ctx.Render(fmt.Sprintf("  Severity:   %d high • %d medium • %d low", high, med, low)))
+	b.WriteString("\n\n")
+
+	// Menu items
+	menuItems := []struct{ label, hint string }{
+		{"Browse findings", fmt.Sprintf("split-panel view (%d findings)", len(m.findings))},
+		{"Top findings", "ranked by frequency"},
+		{"History", "sofe history (exits TUI)"},
+		{"Watch mode", "sofe watch (exits TUI)"},
+		{"Account status", "sofe status (exits TUI)"},
+		{"Quit", ""},
+	}
+
+	for i, item := range menuItems {
+		line := item.label
+		if item.hint != "" {
+			line += "  " + lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(item.hint)
+		}
+		if i == m.menuCursor {
+			b.WriteString(selectedStyle.Render("  ▸ " + line))
+		} else {
+			b.WriteString(normalStyle.Render("    " + line))
+		}
+		b.WriteString("\n")
+	}
+
+	// Update notice
+	if m.updateMsg != "" {
+		b.WriteString("\n")
+		b.WriteString(m.updateMsg)
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(helpBarStyle.Render(" ↑/↓ select • enter confirm • q quit"))
+
+	return b.String()
 }
 
 func (m tuiModel) splitView() string {
@@ -310,7 +423,7 @@ func (m tuiModel) splitView() string {
 	panels := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 
 	// Help bar
-	help := helpBarStyle.Render(" ↑↓/jk navigate • e explain • / filter • tab panel • gg/G jump • q quit")
+	help := helpBarStyle.Render(" ↑↓/jk navigate • e explain • / filter • tab panel • esc menu • q quit")
 	if m.filterMode {
 		help = filterStyle.Render(fmt.Sprintf(" Filter: %s█ (enter confirm, esc cancel)", m.filter))
 	}
