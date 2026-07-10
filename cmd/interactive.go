@@ -618,7 +618,28 @@ var interactiveCmd = &cobra.Command{
 			var hist HistoryResponse
 			json.Unmarshal(data, &hist)
 			if len(hist.Evaluations) == 0 {
-				color.Yellow("No evaluations found. Run 'sofe evaluate --cloud' first.")
+				fmt.Println()
+				fmt.Println(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("11")).Render("  No evaluations yet"))
+				fmt.Println()
+				fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("  To get started:"))
+				fmt.Println()
+				if cfg.Mode == "cloud" || cfg.APIKey != "" {
+					fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("    1. Connect an AWS account:"))
+					fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("       → platform.sofe.dev/accounts"))
+					fmt.Println()
+					fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("    2. Run your first evaluation:"))
+					fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("       → sofe evaluate --cloud"))
+					fmt.Println()
+					fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("    3. Then come back:"))
+					fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("       → sofe interactive"))
+				} else {
+					fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("    1. Start local server:"))
+					fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("       → sofe serve"))
+					fmt.Println()
+					fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("    2. Run evaluation:"))
+					fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("       → sofe evaluate"))
+				}
+				fmt.Println()
 				return
 			}
 			evalID = hist.Evaluations[0].ID
