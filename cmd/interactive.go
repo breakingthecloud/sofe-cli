@@ -116,7 +116,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor--
 			}
 		case "down", "j":
-			if m.view == "menu" && m.menuCursor < 2 {
+			if m.view == "menu" && m.menuCursor < 3 {
 				m.menuCursor++
 			} else if m.view == "list" && m.cursor < len(m.findings)-1 {
 				m.cursor++
@@ -126,9 +126,9 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch m.menuCursor {
 				case 0: // Browse findings
 					m.view = "list"
-				case 1: // Summary
-					// stay on menu, show summary inline (already visible)
-				case 2: // Quit
+				case 1: // Severity breakdown (inline, no action needed)
+				case 2: // Account status (inline, no action needed)
+				case 3: // Quit
 					return m, tea.Quit
 				}
 			} else if m.view == "list" {
@@ -208,7 +208,7 @@ func (m tuiModel) View() string {
 func (m tuiModel) menuView() string {
 	var b strings.Builder
 
-	b.WriteString(titleStyle.Render("🔍 SOFE Interactive"))
+	b.WriteString(titleStyle.Render("SOFE Interactive"))
 	b.WriteString("\n\n")
 
 	// Evaluation summary
@@ -223,6 +223,7 @@ func (m tuiModel) menuView() string {
 	menuItems := []string{
 		fmt.Sprintf("Browse findings (%d)", len(m.findings)),
 		"View severity breakdown",
+		"Account status",
 		"Quit",
 	}
 
@@ -235,7 +236,7 @@ func (m tuiModel) menuView() string {
 		b.WriteString("\n")
 	}
 
-	// Show severity breakdown inline if selected
+	// Show inline content based on selection
 	if m.menuCursor == 1 {
 		b.WriteString("\n")
 		high, med, low := 0, 0, 0
@@ -249,8 +250,31 @@ func (m tuiModel) menuView() string {
 				low++
 			}
 		}
-		breakdown := fmt.Sprintf("  🔴 High: %d  🟡 Medium: %d  🟢 Low: %d", high, med, low)
+		breakdown := fmt.Sprintf("  HIGH: %d  |  MEDIUM: %d  |  LOW: %d", high, med, low)
 		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Render(breakdown))
+
+		// Top policies
+		policyCount := map[string]int{}
+		for _, f := range m.findings {
+			policyCount[f.PolicyName]++
+		}
+		b.WriteString("\n\n")
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("  Top policies:"))
+		b.WriteString("\n")
+		shown := 0
+		for policy, count := range policyCount {
+			if shown >= 5 {
+				break
+			}
+			b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(fmt.Sprintf("    %s (%d)", policy, count)))
+			b.WriteString("\n")
+			shown++
+		}
+	} else if m.menuCursor == 2 {
+		b.WriteString("\n")
+		statusInfo := fmt.Sprintf("  Mode:     cloud\n  API Key:  %s...%s\n  Findings: %d in latest eval",
+			cfg.APIKey[:12], cfg.APIKey[len(cfg.APIKey)-4:], len(m.findings))
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Render(statusInfo))
 	}
 
 	b.WriteString("\n\n")
@@ -262,7 +286,7 @@ func (m tuiModel) menuView() string {
 func (m tuiModel) listView() string {
 	var b strings.Builder
 
-	b.WriteString(titleStyle.Render(fmt.Sprintf("🔍 Findings — %d total", len(m.findings))))
+	b.WriteString(titleStyle.Render(fmt.Sprintf("Findings — %d total", len(m.findings))))
 	b.WriteString("\n\n")
 
 	maxShow := m.height - 6
