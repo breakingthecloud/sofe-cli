@@ -76,21 +76,59 @@ func renderWelcomeBanner() string {
 
 	// Commands section
 	b.WriteString("\n")
-	b.WriteString(bannerSection.Render("Commands"))
+	b.WriteString(bannerSection.Render("Core"))
 	b.WriteString("\n")
 
-	commands := []struct{ cmd, desc string }{
+	coreCommands := []struct{ cmd, desc string }{
 		{"evaluate", "Run policies against AWS resources"},
-		{"interactive", "Browse findings in TUI"},
+		{"interactive", "Browse findings (split-panel TUI)"},
 		{"history", "List past evaluations"},
-		{"explain", "AI explanation for a finding"},
-		{"remediate", "Show/run fix commands"},
-		{"status", "Account & tier info"},
-		{"changelog", "What's new in this version"},
-		{"upgrade", "Connect to cloud or upgrade tier"},
+		{"watch", "Monitor with live sparkline"},
+	}
+	for _, c := range coreCommands {
+		b.WriteString("  " + bannerCmd.Render(fmt.Sprintf("%-14s", c.cmd)) + bannerDesc.Render(c.desc) + "\n")
 	}
 
-	for _, c := range commands {
+	b.WriteString("\n")
+	b.WriteString(bannerSection.Render("AI + Remediation"))
+	b.WriteString("\n")
+
+	aiCommands := []struct{ cmd, desc string }{
+		{"explain", "AI explanation for a finding"},
+		{"remediate", "Show/run fix commands"},
+		{"top", "Findings ranked by frequency"},
+		{"diff", "Compare two evaluations"},
+	}
+	for _, c := range aiCommands {
+		b.WriteString("  " + bannerCmd.Render(fmt.Sprintf("%-14s", c.cmd)) + bannerDesc.Render(c.desc) + "\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(bannerSection.Render("Account"))
+	b.WriteString("\n")
+
+	accountCommands := []struct{ cmd, desc string }{
+		{"login", "Authenticate via browser"},
+		{"upgrade", "Connect to cloud or upgrade tier"},
+		{"status", "Account & tier info"},
+		{"config", "Manage configuration"},
+	}
+	for _, c := range accountCommands {
+		b.WriteString("  " + bannerCmd.Render(fmt.Sprintf("%-14s", c.cmd)) + bannerDesc.Render(c.desc) + "\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(bannerSection.Render("Utilities"))
+	b.WriteString("\n")
+
+	utilCommands := []struct{ cmd, desc string }{
+		{"serve", "Start local server"},
+		{"policies", "List loaded policies"},
+		{"changelog", "What's new in this version"},
+		{"version", "Build info"},
+		{"completion", "Shell autocompletion (bash/zsh/fish)"},
+	}
+	for _, c := range utilCommands {
 		b.WriteString("  " + bannerCmd.Render(fmt.Sprintf("%-14s", c.cmd)) + bannerDesc.Render(c.desc) + "\n")
 	}
 
