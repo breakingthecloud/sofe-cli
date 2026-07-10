@@ -11,7 +11,7 @@ builds:
       - arm64
     binary: sofe
     ldflags:
-      - -s -w -X main.version={{.Version}}
+      - -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}} -X main.date={{.Date}}
 
 archives:
   - format: tar.gz

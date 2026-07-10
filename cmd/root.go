@@ -14,6 +14,8 @@ var (
 	apiClient  *client.Client
 	formatFlag string
 	Version    string
+	Commit     string
+	BuildDate  string
 )
 
 var rootCmd = &cobra.Command{
@@ -23,6 +25,20 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		cfg = config.Load()
 		apiClient = client.New(cfg.APIURL, cfg.APIKey)
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		// Show welcome banner when sofe is run without subcommand
+		if cfg == nil || cfg.APIKey == "" {
+			fmt.Println(renderFirstRunBanner())
+		} else {
+			fmt.Println(renderWelcomeBanner())
+		}
+
+		// Non-blocking update check
+		if msg := checkForUpdate(); msg != "" {
+			fmt.Println()
+			fmt.Println(msg)
+		}
 	},
 }
 
