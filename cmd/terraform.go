@@ -46,10 +46,20 @@ Evaluates FinOps policies BEFORE you apply — catch issues in PRs, not producti
 			mode = "directory"
 			printStep(stepRun, fmt.Sprintf("Scanning .tf files in %s...", path))
 			resources, err = terraform.ParseDirectory(path)
+			if err == nil {
+				clearLine()
+				printStep(stepDone, fmt.Sprintf("Parsed %d planned resources (mode: directory — basic detection)", len(resources)))
+				fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(
+					"  ⚠ For accurate results, use: terraform show -json tfplan > plan.json"))
+			}
 		} else if strings.HasSuffix(path, ".json") {
 			mode = "plan"
 			printStep(stepRun, fmt.Sprintf("Parsing plan JSON: %s...", filepath.Base(path)))
 			resources, err = terraform.ParsePlanJSON(path)
+			if err == nil {
+				clearLine()
+				printStep(stepDone, fmt.Sprintf("Parsed %d planned resources (mode: plan — deterministic)", len(resources)))
+			}
 		} else {
 			color.Red("  Error: path must be a directory (with .tf files) or a .json plan file")
 			return
@@ -60,9 +70,6 @@ Evaluates FinOps policies BEFORE you apply — catch issues in PRs, not producti
 			printStep(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("✗"), err.Error())
 			return
 		}
-
-		clearLine()
-		printStep(stepDone, fmt.Sprintf("Parsed %d planned resources (mode: %s)", len(resources), mode))
 
 		if len(resources) == 0 {
 			printStep(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("!"), "No resources found in the plan")
