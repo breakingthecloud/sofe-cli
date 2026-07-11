@@ -40,10 +40,8 @@ Evaluates FinOps policies BEFORE you apply — catch issues in PRs, not producti
 		fmt.Println()
 
 		var resources []terraform.Resource
-		var mode string
 
 		if info.IsDir() {
-			mode = "directory"
 			printStep(stepRun, fmt.Sprintf("Scanning .tf files in %s...", path))
 			resources, err = terraform.ParseDirectory(path)
 			if err == nil {
@@ -53,7 +51,6 @@ Evaluates FinOps policies BEFORE you apply — catch issues in PRs, not producti
 					"  ⚠ For accurate results, use: terraform show -json tfplan > plan.json"))
 			}
 		} else if strings.HasSuffix(path, ".json") {
-			mode = "plan"
 			printStep(stepRun, fmt.Sprintf("Parsing plan JSON: %s...", filepath.Base(path)))
 			resources, err = terraform.ParsePlanJSON(path)
 			if err == nil {
