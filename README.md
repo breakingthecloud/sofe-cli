@@ -64,20 +64,39 @@ Environment variables (override config):
 
 ## Commands
 
+### Core
 | Command | Description |
 |---------|-------------|
-| `sofe evaluate` | Run policies against AWS resources |
-| `sofe serve` | Start local evaluation server (port 8080) |
-| `sofe policies` | List available policies |
+| `sofe evaluate` | Run policies against AWS resources (spinner + summary card) |
+| `sofe interactive` | Split-panel TUI (findings + detail + AI) |
 | `sofe history` | List past evaluations (cloud mode) |
-| `sofe status` | Show account status (tier, evals, AI usage) |
+| `sofe watch` | Monitor with live sparkline + change detection |
+
+### AI + Remediation
+| Command | Description |
+|---------|-------------|
 | `sofe explain` | AI explanation for a specific finding |
 | `sofe remediate` | Show/execute remediation CLI commands |
-| `sofe interactive` | TUI to browse findings interactively |
+| `sofe top` | Findings ranked by frequency |
+| `sofe diff` | Compare two evaluations (new/fixed/unchanged) |
+
+### Account
+| Command | Description |
+|---------|-------------|
+| `sofe login` | Authenticate via browser (device flow) |
 | `sofe upgrade` | Connect to SOFE Cloud or upgrade to Pro |
+| `sofe status` | Show account status (tier, evals, AI usage) |
+| `sofe config` | Manage configuration (set/show) |
+
+### Utilities
+| Command | Description |
+|---------|-------------|
+| `sofe serve` | Start local evaluation server (port 8080) |
+| `sofe policies` | List available policies |
+| `sofe changelog` | Show release notes |
+| `sofe version` | Build info (commit, date, Go, OS) |
 | `sofe terraform` | Scan Terraform plans (coming soon) |
-| `sofe config set` | Set configuration value |
-| `sofe config show` | Show current configuration |
+| `sofe completion` | Shell autocompletion (bash/zsh/fish) |
 
 ## New in v0.3.0
 
