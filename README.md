@@ -1,5 +1,8 @@
 # SOFE CLI
 
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8)](https://go.dev)
+
 > Command-line interface for the SOFE Open FinOps Engine. Evaluate cloud cost policies locally or via the cloud API.
 
 ## Install
