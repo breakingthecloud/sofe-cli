@@ -1,9 +1,40 @@
-# SOFE CLI
+<p align="center">
+  <img alt="SOFE CLI" src="https://img.shields.io/badge/⌨️-SOFE_CLI-3B82F6?style=for-the-badge" height="50">
+</p>
 
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8)](https://go.dev)
+<p align="center">
+  <b>Command-line interface for the SOFE Open FinOps Engine</b><br>
+  19 commands, interactive TUI, AI-powered remediation.
+</p>
 
-> Command-line interface for the SOFE Open FinOps Engine. Evaluate cloud cost policies locally or via the cloud API.
+<p align="center">
+  <a href="#quick-start">Quick Start</a>
+  ·
+  <a href="#commands">Commands</a>
+  ·
+  <a href="#new-in-v030">v0.3 Features</a>
+  ·
+  <a href="#ecosystem">Ecosystem</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/license-Apache_2.0-3B82F6?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/Go-1.21%2B-00ADD8?style=flat-square&logo=go" alt="Go">
+  <img src="https://img.shields.io/badge/modes-Local+Cloud-3B82F6?style=flat-square" alt="Local + Cloud">
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square" alt="PRs">
+</p>
+
+---
+
+Evaluate FinOps policies, browse findings in an interactive TUI, get AI-powered remediation commands — all from your terminal.
+
+```bash
+# Quick install (macOS/Linux)
+curl -fsSL https://sofe.dev/install.sh | bash
+
+# Evaluate your AWS account
+sofe evaluate --profile default --policies ./policies/
+```
 
 ## Install
 
@@ -20,7 +51,7 @@ go install github.com/breakingthecloud/sofe-cli@latest
 
 ## Quick Start
 
-### Local Mode (self-hosted, no account needed)
+### Local Mode
 
 ```bash
 # Start the local evaluation server
@@ -33,7 +64,7 @@ sofe evaluate --profile default --policies ./policies/
 sofe evaluate --auto-serve --profile default
 ```
 
-### Cloud Mode (uses api.sofe.dev)
+### Cloud Mode
 
 ```bash
 # Set your API key (get one at platform.sofe.dev)
@@ -46,28 +77,10 @@ sofe evaluate --cloud
 sofe evaluate --cloud --api-key sk_sofe_xxx
 ```
 
-## Configuration
-
-```bash
-# Show current config
-sofe config show
-
-# Set values
-sofe config set mode cloud          # default to cloud mode
-sofe config set api-key sk_sofe_xxx # persist API key
-sofe config set profile my-profile  # AWS profile for local mode
-sofe config set format json         # output format (table|json|markdown)
-```
-
-Config stored at `~/.sofe/config.yaml` (permissions 0600).
-
-Environment variables (override config):
-- `SOFE_API_KEY` — API key for cloud mode
-- `SOFE_CLOUD_URL` — custom cloud URL (default: https://api.sofe.dev)
-
 ## Commands
 
 ### Core
+
 | Command | Description |
 |---------|-------------|
 | `sofe evaluate` | Run policies against AWS resources (spinner + summary card) |
@@ -76,6 +89,7 @@ Environment variables (override config):
 | `sofe watch` | Monitor with live sparkline + change detection |
 
 ### AI + Remediation
+
 | Command | Description |
 |---------|-------------|
 | `sofe explain` | AI explanation for a specific finding |
@@ -84,6 +98,7 @@ Environment variables (override config):
 | `sofe diff` | Compare two evaluations (new/fixed/unchanged) |
 
 ### Account
+
 | Command | Description |
 |---------|-------------|
 | `sofe login` | Authenticate via browser (device flow) |
@@ -92,13 +107,14 @@ Environment variables (override config):
 | `sofe config` | Manage configuration (set/show) |
 
 ### Utilities
+
 | Command | Description |
 |---------|-------------|
 | `sofe serve` | Start local evaluation server (port 8080) |
 | `sofe policies` | List available policies |
 | `sofe changelog` | Show release notes |
 | `sofe version` | Build info (commit, date, Go, OS) |
-| `sofe terraform` | Scan Terraform plans (coming soon) |
+| `sofe terraform` | Scan Terraform plans |
 | `sofe completion` | Shell autocompletion (bash/zsh/fish) |
 
 ## New in v0.3.0
@@ -106,11 +122,8 @@ Environment variables (override config):
 ### Interactive TUI
 
 ```bash
-# Browse findings with keyboard navigation
-sofe interactive
-
-# Or specify an evaluation
-sofe interactive abc123-eval-id
+sofe interactive              # Browse findings with keyboard navigation
+sofe interactive abc123-eval-id  # Or specify an evaluation
 ```
 
 Navigate with ↑/↓, press Enter for details, `e` for AI explanation, `q` to quit.
@@ -118,34 +131,17 @@ Navigate with ↑/↓, press Enter for details, `e` for AI explanation, `q` to q
 ### AI Explain & Remediate
 
 ```bash
-# Get AI explanation for finding #2
-sofe explain abc123-eval-id --finding 2
-
-# Show remediation commands
-sofe remediate abc123-eval-id --finding 2
-
-# Execute remediation interactively (confirms each command)
-sofe remediate abc123-eval-id --finding 2 --execute
+sofe explain abc123-eval-id --finding 2     # AI explanation
+sofe remediate abc123-eval-id --finding 2   # Show remediation commands
+sofe remediate abc123-eval-id --finding 2 --execute  # Execute interactively
 ```
 
 ### Upgrade & Status
 
 ```bash
-# Connect CLI to SOFE Cloud (saves API key)
-sofe upgrade
-
-# Upgrade to Pro tier (opens billing)
-sofe upgrade pro
-
-# Check your status
-sofe status
-```
-
-### History
-
-```bash
-# See your last 15 evaluations
-sofe history
+sofe upgrade                    # Connect CLI to SOFE Cloud
+sofe upgrade pro                # Upgrade to Pro tier
+sofe status                     # Check your status
 ```
 
 ## Evaluate Flags
@@ -156,17 +152,24 @@ sofe history
 | `--api-key` | API key for cloud mode |
 | `--profile` | AWS profile (local mode) |
 | `--policies` | Policies directory |
-| `--fail-on` | Exit 1 if findings at/above severity (critical\|high\|medium\|low) |
+| `--fail-on` | Exit 1 if findings at/above severity |
 | `--resource-types` | Filter resource types (comma-separated) |
 | `--auto-serve` | Auto-start local server if not running |
 | `--format` | Output format (table\|json\|markdown) |
 
-## CI/CD
+## Configuration
 
 ```bash
-# Block deploys with critical findings
-sofe evaluate --cloud --api-key $SOFE_API_KEY --fail-on high
+sofe config show                              # Show current config
+sofe config set mode cloud                    # Default to cloud mode
+sofe config set api-key sk_sofe_xxx           # Persist API key
+sofe config set profile my-profile            # AWS profile for local mode
+sofe config set format json                   # Output format
 ```
+
+Config stored at `~/.sofe/config.yaml` (permissions 0600).
+
+Environment variables: `SOFE_API_KEY`, `SOFE_CLOUD_URL`.
 
 ## Local vs Cloud
 
@@ -178,13 +181,32 @@ sofe evaluate --cloud --api-key $SOFE_API_KEY --fail-on high
 | Rate limit | None | 10/day (free), 1000/day (pro) |
 | History | None | Stored in platform |
 
-## Links
+## CI/CD
 
-- **Engine:** [github.com/breakingthecloud/sofe](https://github.com/breakingthecloud/sofe) (Python, Apache 2.0)
-- **Platform:** [platform.sofe.dev](https://platform.sofe.dev) (sign up, API keys)
-- **Docs:** [sofe.dev/docs](https://sofe.dev/docs)
-- **PyPI:** [pypi.org/project/sofe](https://pypi.org/project/sofe)
+```bash
+# Block deploys with critical findings
+sofe evaluate --cloud --api-key $SOFE_API_KEY --fail-on high
+```
+
+## Ecosystem
+
+| Project | Description |
+|---------|-------------|
+| [sofe](https://github.com/breakingthecloud/sofe) | Python engine (collectors + policies) |
+| [sofe-server](https://github.com/breakingthecloud/sofe-server) | REST API server |
+| [sofe-action](https://github.com/breakingthecloud/sofe-action) | GitHub Action |
+| [platform.sofe.dev](https://platform.sofe.dev) | SaaS dashboard (free tier) |
+| [sofe.dev/docs](https://sofe.dev/docs) | Documentation |
 
 ## License
 
-Apache 2.0
+Apache 2.0 — see [LICENSE](LICENSE).
+
+---
+
+<p align="center">
+  <a href="https://sofe.dev">sofe.dev</a> · <a href="https://github.com/breakingthecloud/sofe">Engine</a> · <a href="https://finoptix.dev">finoptix.dev</a>
+</p>
+<p align="center">
+  <sub>19 commands. Zero AWS bill surprises.</sub>
+</p>
