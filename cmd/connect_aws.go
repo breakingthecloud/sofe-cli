@@ -3,6 +3,9 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"os/exec"
 
 	"github.com/fatih/color"
@@ -49,10 +52,30 @@ var connectAwsCmd = &cobra.Command{
 			return
 		}
 
-		// Run CloudFormation deploy with the user's own AWS creds (never sent to SOFE).
+		// Download the template locally, then `aws cloudformation deploy --template-file`
+		// (deploy does NOT support --template-url; it manages create/update idempotently).
+		tmpFile, err := os.CreateTemp("", "sofe-role-*.yaml")
+		if err != nil {
+			red.Printf("❌ Cannot create temp file: %s\n", err)
+			return
+		}
+		defer os.Remove(tmpFile.Name())
+
+		resp, err := http.Get(cfn.TemplateURL)
+		if err != nil {
+			red.Printf("❌ Cannot download template: %s\n", err)
+			return
+		}
+		defer resp.Body.Close()
+		if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+			red.Printf("❌ Cannot write template: %s\n", err)
+			return
+		}
+		tmpFile.Close()
+
 		awsArgs := []string{
 			"cloudformation", "deploy",
-			"--template-url", cfn.TemplateURL,
+			"--template-file", tmpFile.Name(),
 			"--stack-name", cfn.StackName,
 			"--parameter-overrides", "ExternalId=" + cfn.ExternalID,
 			"--capabilities", "CAPABILITY_NAMED_IAM",
