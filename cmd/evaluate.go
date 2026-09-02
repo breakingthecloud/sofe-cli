@@ -112,7 +112,9 @@ var evaluateCmd = &cobra.Command{
 		useCloud := cloudMode || cfg.Mode == "cloud"
 
 		if useCloud {
-			return evaluateCloud(dir, prof)
+			// Cloud mode resolves the AWS account server-side (connected account / Lambda role).
+			// The local AWS profile is meaningless to the API — sending it causes ProfileNotFound.
+			return evaluateCloud(dir, "")
 		}
 		return evaluateLocal(dir, prof)
 	},
