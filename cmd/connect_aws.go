@@ -77,8 +77,13 @@ var connectAwsCmd = &cobra.Command{
 			"cloudformation", "deploy",
 			"--template-file", tmpFile.Name(),
 			"--stack-name", cfn.StackName,
+			"--region", "us-east-1",
 			"--parameter-overrides", "ExternalId=" + cfn.ExternalID,
 			"--capabilities", "CAPABILITY_NAMED_IAM",
+		}
+		// Honor the user's configured AWS profile (sofe config set aws-profile <name>)
+		if cfg.AWSProfile != "" {
+			awsArgs = append(awsArgs, "--profile", cfg.AWSProfile)
 		}
 		fmt.Println("☁️  aws cloudformation deploy --stack-name " + cfn.StackName)
 		out, err := exec.Command("aws", awsArgs...).CombinedOutput()
