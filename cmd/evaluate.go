@@ -48,11 +48,11 @@ var (
 )
 
 func printStep(icon, text string) {
-	fmt.Printf("  %s %s\n", icon, text)
+	fmt.Fprintf(os.Stderr, "  %s %s\n", icon, text)
 }
 
 func clearLine() {
-	fmt.Print("\033[1A\033[2K")
+	fmt.Fprint(os.Stderr, "\033[1A\033[2K")
 }
 
 func renderSummaryCard(resp *client.EvaluateResponse) string {
