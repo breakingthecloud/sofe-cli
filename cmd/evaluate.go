@@ -164,9 +164,9 @@ func evaluateCloud(dir, prof string) error {
 	printStep(stepDone, fmt.Sprintf("Complete — %d findings in %.1fs", resp.FindingsCount, elapsed.Seconds()))
 	fmt.Println()
 
-	// Summary card
-	fmt.Println(renderSummaryCard(resp))
-	fmt.Println()
+	// Summary card (human display → stderr so stdout stays machine-clean)
+	fmt.Fprintln(os.Stderr, renderSummaryCard(resp))
+	fmt.Fprintln(os.Stderr)
 
 	// Show table/json/markdown based on format
 	format := formatFlag
