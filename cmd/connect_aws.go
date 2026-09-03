@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -61,6 +62,11 @@ var connectAwsCmd = &cobra.Command{
 		}
 		defer os.Remove(tmpFile.Name())
 
+		// Only fetch the template over HTTPS to prevent MITM of the CFN template.
+		if !strings.HasPrefix(cfn.TemplateURL, "https://") {
+			red.Printf("❌ Refusing non-HTTPS template URL: %s\n", cfn.TemplateURL)
+			return
+		}
 		resp, err := http.Get(cfn.TemplateURL)
 		if err != nil {
 			red.Printf("❌ Cannot download template: %s\n", err)
