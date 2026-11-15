@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -24,6 +24,7 @@ var watchCmd = &cobra.Command{
 		interval, _ := cmd.Flags().GetDuration("interval")
 
 		cloudClient := getCloudClient()
+		account := accountFilter(cmd)
 
 		title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("10"))
 		label := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
@@ -35,13 +36,12 @@ var watchCmd = &cobra.Command{
 
 		renderWatch := func() bool {
 			// Get recent evaluations for trend
-			data, err := cloudClient.Get("/evaluations?limit=7")
+			scoped, err := fetchScopedEvaluations(cloudClient, 7, account)
 			if err != nil {
 				color.Red("Error: %s", err)
 				return false
 			}
-			var hist HistoryResponse
-			json.Unmarshal(data, &hist)
+			hist := HistoryResponse{Evaluations: scoped.Evaluations}
 
 			if len(hist.Evaluations) == 0 {
 				fmt.Println("No evaluations yet.")
@@ -96,6 +96,9 @@ var watchCmd = &cobra.Command{
 			b.WriteString(label.Render("Findings:  ") + value.Render(fmt.Sprintf("%d", latest.FindingsCount)))
 			b.WriteString("  " + value.Render(sparkline))
 			b.WriteString("  " + label.Render("("+trend+")") + "\n")
+			if acct := accountDisplay(latest.AccountID, latest.AccountAlias); acct != "" {
+				b.WriteString(label.Render("Account:   ") + value.Render(acct) + "\n")
+			}
 			b.WriteString(label.Render("Last:      ") + value.Render(latestDate) + "\n")
 			b.WriteString(label.Render("Resources: ") + value.Render(fmt.Sprintf("%d", latest.ResourcesScanned)) + "\n")
 			if changes != "" {
@@ -106,6 +109,9 @@ var watchCmd = &cobra.Command{
 			}
 
 			fmt.Println(box.Render(b.String()))
+			if scoped.Note != "" {
+				fmt.Fprintln(os.Stderr, label.Render(scoped.Note))
+			}
 			return true
 		}
 
@@ -153,6 +159,7 @@ func renderSparkline(values []int) string {
 }
 
 func init() {
+	addAccountFilterFlag(watchCmd)
 	watchCmd.Flags().Bool("once", false, "Show status once and exit (no live refresh)")
 	watchCmd.Flags().Duration("interval", 5*time.Minute, "Refresh interval (e.g. 30s, 5m, 1h)")
 	rootCmd.AddCommand(watchCmd)

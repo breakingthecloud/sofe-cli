@@ -42,13 +42,21 @@ var diffCmd = &cobra.Command{
 			Message    string `json:"message"`
 		}
 		type evalData struct {
-			Findings  []finding `json:"findings"`
-			Timestamp string    `json:"timestamp"`
+			Findings     []finding `json:"findings"`
+			Timestamp    string    `json:"timestamp"`
+			AccountID    string    `json:"account_id"`
+			AccountAlias string    `json:"account_alias"`
 		}
 
 		var eval1, eval2 evalData
 		json.Unmarshal(data1, &eval1)
 		json.Unmarshal(data2, &eval2)
+
+		// New/fixed only means something inside one account.
+		if msg := differentAccountsMessage(eval1.AccountID, eval1.AccountAlias, eval2.AccountID, eval2.AccountAlias); msg != "" {
+			color.Red("%s", msg)
+			return
+		}
 
 		// Build key sets (policy+resource = unique finding)
 		keyOf := func(f finding) string {
@@ -99,8 +107,8 @@ var diffCmd = &cobra.Command{
 
 		fmt.Println()
 		fmt.Println(title.Render("Evaluation Diff"))
-		fmt.Println(label.Render(fmt.Sprintf("  A: %s (%d findings) — %s", id1[:8], len(eval1.Findings), date1)))
-		fmt.Println(label.Render(fmt.Sprintf("  B: %s (%d findings) — %s", id2[:8], len(eval2.Findings), date2)))
+		fmt.Println(label.Render(fmt.Sprintf("  A: %s (%d findings) — %s", shortID(id1), len(eval1.Findings), date1)))
+		fmt.Println(label.Render(fmt.Sprintf("  B: %s (%d findings) — %s", shortID(id2), len(eval2.Findings), date2)))
 		fmt.Println()
 
 		// Summary
