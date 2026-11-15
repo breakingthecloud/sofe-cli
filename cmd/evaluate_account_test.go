@@ -11,15 +11,15 @@ func f64(v float64) *float64 { return &v }
 
 func TestValidAccountID(t *testing.T) {
 	for id, want := range map[string]bool{
-		"916272138274":                   true,
-		"000000000001":                   true,
-		"91627213827":                    false, // 11 digits
-		"9162721382741":                  false, // 13 digits
-		"91627213827a":                   false,
+		"111111111111":                   true,
+		"000000000000":                   true,
+		"11111111111":                    false, // 11 digits
+		"1111111111111":                  false, // 13 digits
+		"11111111111a":                   false,
 		"":                               false,
-		" 916272138274":                  false,
-		"9162 7213 8274":                 false,
-		"arn:aws:iam::916272138274:root": false,
+		" 111111111111":                  false,
+		"1111 1111 1111":                 false,
+		"arn:aws:iam::111111111111:root": false,
 	} {
 		if got := validAccountID(id); got != want {
 			t.Errorf("validAccountID(%q) = %v, want %v", id, got, want)
@@ -30,9 +30,9 @@ func TestValidAccountID(t *testing.T) {
 func TestDescribeAccountRequiredListsEveryAccount(t *testing.T) {
 	text := describeCloudError(&client.APIError{
 		Status: 400, Code: "account_required",
-		Accounts: []client.AccountRef{{AccountID: "916272138274", Alias: "dev"}, {AccountID: "279624932954", Alias: "payer"}},
+		Accounts: []client.AccountRef{{AccountID: "111111111111", Alias: "dev"}, {AccountID: "222222222222", Alias: "payer"}},
 	})
-	for _, want := range []string{"Choose one with --account", "--account 916272138274   dev", "--account 279624932954   payer"} {
+	for _, want := range []string{"Choose one with --account", "--account 111111111111   dev", "--account 222222222222   payer"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("missing %q in:\n%s", want, text)
 		}
@@ -48,9 +48,9 @@ func TestDescribeAccountRequiredWithoutAList(t *testing.T) {
 
 func TestDescribeAccountWithoutAlias(t *testing.T) {
 	text := describeCloudError(&client.APIError{
-		Status: 400, Code: "account_required", Accounts: []client.AccountRef{{AccountID: "916272138274"}},
+		Status: 400, Code: "account_required", Accounts: []client.AccountRef{{AccountID: "111111111111"}},
 	})
-	if !strings.Contains(text, "--account 916272138274") || strings.Contains(text, "916272138274   ") {
+	if !strings.Contains(text, "--account 111111111111") || strings.Contains(text, "111111111111   ") {
 		t.Errorf("no trailing alias column expected:\n%q", text)
 	}
 }
@@ -93,8 +93,8 @@ func TestAccountLine(t *testing.T) {
 		resp client.EvaluateResponse
 		want string
 	}{
-		{client.EvaluateResponse{AccountID: "916272138274", AccountAlias: "dev"}, "dev (916272138274)"},
-		{client.EvaluateResponse{AccountID: "916272138274"}, "916272138274"},
+		{client.EvaluateResponse{AccountID: "111111111111", AccountAlias: "dev"}, "dev (111111111111)"},
+		{client.EvaluateResponse{AccountID: "111111111111"}, "111111111111"},
 		{client.EvaluateResponse{}, ""},
 	} {
 		r := c.resp
@@ -105,8 +105,8 @@ func TestAccountLine(t *testing.T) {
 }
 
 func TestCostLine(t *testing.T) {
-	partial := client.EvaluateResponse{CostStatus: "partial", CostAccountMonthly: f64(26.92), CostMatchedMonthly: f64(0.8), CostCoverageUSD: f64(0.0297)}
-	if got, want := costLine(&partial), "$26.92/mo (attributed to resources: $0.80, 3%)"; got != want {
+	partial := client.EvaluateResponse{CostStatus: "partial", CostAccountMonthly: f64(40.00), CostMatchedMonthly: f64(1.2), CostCoverageUSD: f64(0.03)}
+	if got, want := costLine(&partial), "$40.00/mo (attributed to resources: $1.20, 3%)"; got != want {
 		t.Errorf("partial = %q, want %q", got, want)
 	}
 	tiny := client.EvaluateResponse{CostStatus: "partial", CostAccountMonthly: f64(500), CostMatchedMonthly: f64(1), CostCoverageUSD: f64(0.002)}
@@ -144,11 +144,11 @@ func TestCostLineNeverInventsNumbers(t *testing.T) {
 func TestSummaryCardShowsAccountAndCost(t *testing.T) {
 	resp := &client.EvaluateResponse{
 		EvaluationID: "11111111-2222-3333-4444-555555555555", FindingsCount: 3,
-		AccountID: "916272138274", AccountAlias: "dev",
-		CostStatus: "partial", CostAccountMonthly: f64(26.92), CostMatchedMonthly: f64(0.8), CostCoverageUSD: f64(0.0297),
+		AccountID: "111111111111", AccountAlias: "dev",
+		CostStatus: "partial", CostAccountMonthly: f64(40.00), CostMatchedMonthly: f64(1.2), CostCoverageUSD: f64(0.03),
 	}
 	card := renderSummaryCard(resp)
-	for _, want := range []string{"Account:", "dev (916272138274)", "Cost:", "$26.92/mo"} {
+	for _, want := range []string{"Account:", "dev (111111111111)", "Cost:", "$40.00/mo"} {
 		if !strings.Contains(card, want) {
 			t.Errorf("summary card missing %q:\n%s", want, card)
 		}
