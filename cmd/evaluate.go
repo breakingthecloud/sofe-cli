@@ -98,7 +98,7 @@ func renderSummaryCard(resp *client.EvaluateResponse) string {
 	b.WriteString(summaryLabel.Render("View:") + summaryLink.Render("platform.sofe.dev/history") + "\n")
 	b.WriteString(summaryLabel.Render("Next:") + summaryLink.Render("sofe interactive") +
 		lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(" • ") +
-		summaryLink.Render(fmt.Sprintf("sofe explain %s -f 0", resp.EvaluationID[:8])) + "\n")
+		summaryLink.Render(fmt.Sprintf("sofe explain %s -f 0", shortID(resp.EvaluationID))) + "\n")
 	b.WriteString(summaryLabel.Render("ID:") + summaryValue.Render(resp.EvaluationID) + "\n")
 
 	return summaryBox.Render(b.String())

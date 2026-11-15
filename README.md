@@ -82,6 +82,18 @@ sofe evaluate --cloud --account 123456789012
 
 With more than one connected account, `sofe evaluate --cloud` without `--account` lists them and asks you to choose.
 
+## Which AWS account does it evaluate?
+
+| Mode | How you pick it | AWS account evaluated | `--account` |
+|------|-----------------|-----------------------|-------------|
+| Local / self-hosted (default) | `sofe evaluate` | The one your own credentials point to: `--profile` / `aws_profile`, or the default AWS credential chain (environment variables, `~/.aws`, instance role). Nothing is sent to SOFE Cloud and no account ID is sent to the server. | Rejected with a clear message |
+| Cloud | `sofe evaluate --cloud` (or `mode: cloud`) | An account you connected at platform.sofe.dev/accounts | Required only when **two or more** accounts are connected; without it the CLI lists them |
+
+`sofe history`, `sofe watch`, `sofe top` and `sofe interactive` only read evaluations that already exist. With several accounts:
+`history` lists them all with an **Account** column; `watch`, `top` and `interactive` use the account of your most recent
+evaluation and tell you which one (and which others exist). Pass `--account <id>` to any of them to choose.
+`sofe diff` refuses to compare two evaluations of different accounts.
+
 ## Commands
 
 ### Core

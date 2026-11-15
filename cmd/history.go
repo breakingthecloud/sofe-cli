@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -17,6 +16,9 @@ type Evaluation struct {
 	FindingsCount    int    `json:"findings_count"`
 	ResourcesScanned int    `json:"resources_scanned"`
 	Trigger          string `json:"trigger"`
+	// AWS account the evaluation ran against; empty for evaluations stored before account tracking (S111).
+	AccountID    string `json:"account_id"`
+	AccountAlias string `json:"account_alias"`
 }
 
 type HistoryResponse struct {
@@ -34,14 +36,13 @@ var historyCmd = &cobra.Command{
 		}
 
 		cloudClient := getCloudClient()
-		data, err := cloudClient.Get("/evaluations?limit=15")
+		// A listing shows every account unless --account narrows it.
+		scoped, err := fetchEvaluationList(cloudClient, 15, accountFilter(cmd), false)
 		if err != nil {
 			color.Red("❌ %s", err)
 			return
 		}
-
-		var resp HistoryResponse
-		json.Unmarshal(data, &resp)
+		resp := HistoryResponse{Evaluations: scoped.Evaluations}
 
 		if len(resp.Evaluations) == 0 {
 			fmt.Println("No evaluations yet. Run 'sofe evaluate --cloud' to start.")
@@ -52,9 +53,10 @@ var historyCmd = &cobra.Command{
 		green.Printf("📊 Evaluation History (%d results)\n\n", len(resp.Evaluations))
 
 		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"#", "Date", "Findings", "Resources", "Trigger"})
+		table.SetHeader([]string{"#", "Date", "Account", "Findings", "Resources", "Trigger"})
 		table.SetBorder(true)
 		table.SetHeaderColor(
+			tablewriter.Colors{tablewriter.Bold},
 			tablewriter.Colors{tablewriter.Bold},
 			tablewriter.Colors{tablewriter.Bold},
 			tablewriter.Colors{tablewriter.Bold, tablewriter.FgGreenColor},
@@ -69,9 +71,14 @@ var historyCmd = &cobra.Command{
 			if trigger == "" {
 				trigger = "manual"
 			}
+			account := accountDisplay(eval.AccountID, eval.AccountAlias)
+			if account == "" {
+				account = "—"
+			}
 			table.Append([]string{
 				fmt.Sprintf("%d", i+1),
 				dateStr,
+				account,
 				fmt.Sprintf("%d", eval.FindingsCount),
 				fmt.Sprintf("%d", eval.ResourcesScanned),
 				trigger,
@@ -82,5 +89,6 @@ var historyCmd = &cobra.Command{
 }
 
 func init() {
+	addAccountFilterFlag(historyCmd)
 	rootCmd.AddCommand(historyCmd)
 }

@@ -328,7 +328,7 @@ func (m tuiModel) menuView() string {
 
 	// Evaluation context
 	ctx := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	b.WriteString(ctx.Render(fmt.Sprintf("  Evaluation: %s (%s)", m.evalID[:8]+"...", m.evalTrigger)))
+	b.WriteString(ctx.Render(fmt.Sprintf("  Evaluation: %s (%s)", shortID(m.evalID)+"...", m.evalTrigger)))
 	b.WriteString("\n")
 
 	// Severity summary
@@ -610,13 +610,15 @@ var interactiveCmd = &cobra.Command{
 		if len(args) > 0 {
 			evalID = args[0]
 		} else {
-			data, err := cloudClient.Get("/evaluations?limit=1")
+			scoped, err := fetchScopedEvaluations(cloudClient, 1, accountFilter(cmd))
 			if err != nil {
 				color.Red("Error: %s", err)
 				return
 			}
-			var hist HistoryResponse
-			json.Unmarshal(data, &hist)
+			hist := HistoryResponse{Evaluations: scoped.Evaluations}
+			if scoped.Note != "" {
+				fmt.Fprintln(os.Stderr, scoped.Note)
+			}
 			if len(hist.Evaluations) == 0 {
 				fmt.Println()
 				fmt.Println(lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("11")).Render("  No evaluations yet"))
@@ -686,5 +688,6 @@ var interactiveCmd = &cobra.Command{
 }
 
 func init() {
+	addAccountFilterFlag(interactiveCmd)
 	rootCmd.AddCommand(interactiveCmd)
 }
