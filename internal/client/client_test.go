@@ -27,11 +27,11 @@ func fakeAPI(t *testing.T, status int, body string) (*Client, *map[string]any) {
 
 func TestEvaluateSendsAccountIDWhenGiven(t *testing.T) {
 	c, sent := fakeAPI(t, 200, `{"evaluation_id":"e1"}`)
-	if _, err := c.Evaluate(EvaluateRequest{PoliciesDir: "p", AccountID: "916272138274"}); err != nil {
+	if _, err := c.Evaluate(EvaluateRequest{PoliciesDir: "p", AccountID: "111111111111"}); err != nil {
 		t.Fatal(err)
 	}
-	if got := (*sent)["account_id"]; got != "916272138274" {
-		t.Fatalf("account_id sent = %v, want 916272138274", got)
+	if got := (*sent)["account_id"]; got != "111111111111" {
+		t.Fatalf("account_id sent = %v, want 111111111111", got)
 	}
 }
 
@@ -48,7 +48,7 @@ func TestEvaluateOmitsAccountIDWhenEmpty(t *testing.T) {
 
 func TestAccountRequiredIsATypedErrorWithTheList(t *testing.T) {
 	body := `{"error":"account_required","message":"Several AWS accounts are connected.","accounts":[` +
-		`{"account_id":"916272138274","alias":"dev"},{"account_id":"279624932954","alias":"payer"}]}`
+		`{"account_id":"111111111111","alias":"dev"},{"account_id":"222222222222","alias":"payer"}]}`
 	c, _ := fakeAPI(t, 400, body)
 	_, err := c.Evaluate(EvaluateRequest{PoliciesDir: "p"})
 
@@ -59,7 +59,7 @@ func TestAccountRequiredIsATypedErrorWithTheList(t *testing.T) {
 	if apiErr.Status != 400 || apiErr.Code != "account_required" {
 		t.Fatalf("status/code = %d/%q", apiErr.Status, apiErr.Code)
 	}
-	if len(apiErr.Accounts) != 2 || apiErr.Accounts[1].AccountID != "279624932954" || apiErr.Accounts[1].Alias != "payer" {
+	if len(apiErr.Accounts) != 2 || apiErr.Accounts[1].AccountID != "222222222222" || apiErr.Accounts[1].Alias != "payer" {
 		t.Fatalf("accounts = %+v", apiErr.Accounts)
 	}
 }
@@ -91,17 +91,17 @@ func TestAPIErrorWithANonJSONBody(t *testing.T) {
 }
 
 func TestResponseCarriesAccountAndCostFields(t *testing.T) {
-	body := `{"evaluation_id":"e1","findings_count":3,"account_id":"916272138274","account_alias":"dev",` +
-		`"cost_status":"partial","cost_coverage_usd":0.0297,"cost_account_monthly":26.92,"cost_matched_monthly":0.8}`
+	body := `{"evaluation_id":"e1","findings_count":3,"account_id":"111111111111","account_alias":"dev",` +
+		`"cost_status":"partial","cost_coverage_usd":0.03,"cost_account_monthly":40.00,"cost_matched_monthly":1.2}`
 	c, _ := fakeAPI(t, 200, body)
 	r, err := c.Evaluate(EvaluateRequest{PoliciesDir: "p"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.AccountID != "916272138274" || r.AccountAlias != "dev" || r.CostStatus != "partial" {
+	if r.AccountID != "111111111111" || r.AccountAlias != "dev" || r.CostStatus != "partial" {
 		t.Fatalf("account/cost status = %q/%q/%q", r.AccountID, r.AccountAlias, r.CostStatus)
 	}
-	if r.CostAccountMonthly == nil || *r.CostAccountMonthly != 26.92 || r.CostMatchedMonthly == nil || *r.CostMatchedMonthly != 0.8 {
+	if r.CostAccountMonthly == nil || *r.CostAccountMonthly != 40.00 || r.CostMatchedMonthly == nil || *r.CostMatchedMonthly != 1.2 {
 		t.Fatalf("cost numbers = %v / %v", r.CostAccountMonthly, r.CostMatchedMonthly)
 	}
 }

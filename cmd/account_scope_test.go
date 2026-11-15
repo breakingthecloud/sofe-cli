@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	acctDev   = "916272138274"
-	acctPayer = "279624932954"
+	acctDev   = "111111111111"
+	acctPayer = "222222222222"
 )
 
 func ev(id, account, alias string) Evaluation {
@@ -127,9 +127,9 @@ func listServer(t *testing.T, body string) (*client.Client, *[]string) {
 }
 
 const mixedList = `{"evaluations":[` +
-	`{"id":"p2","account_id":"279624932954","account_alias":"payer","findings_count":9},` +
-	`{"id":"d2","account_id":"916272138274","account_alias":"dev","findings_count":3},` +
-	`{"id":"p1","account_id":"279624932954","account_alias":"payer","findings_count":8}]}`
+	`{"id":"p2","account_id":"222222222222","account_alias":"payer","findings_count":9},` +
+	`{"id":"d2","account_id":"111111111111","account_alias":"dev","findings_count":3},` +
+	`{"id":"p1","account_id":"222222222222","account_alias":"payer","findings_count":8}]}`
 
 func TestFetchAsksForEnoughRowsAndTruncatesAfterScoping(t *testing.T) {
 	c, paths := listServer(t, mixedList)
