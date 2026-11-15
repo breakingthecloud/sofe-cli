@@ -28,6 +28,9 @@ type EvaluateRequest struct {
 	Profile       string   `json:"profile,omitempty"`
 	ResourceTypes []string `json:"resource_types,omitempty"`
 	FailOn        string   `json:"fail_on,omitempty"`
+	// AccountID is the connected AWS account to evaluate (cloud mode). Required by api.sofe.dev when
+	// more than one account is connected; omitted for the local server.
+	AccountID string `json:"account_id,omitempty"`
 }
 
 type Finding struct {
@@ -50,6 +53,50 @@ type EvaluateResponse struct {
 	TotalEstimatedSavings float64  `json:"total_estimated_savings"`
 	Failed               bool      `json:"failed"`
 	Findings             []Finding `json:"findings"`
+
+	// Account and cost data (api.sofe.dev, S111). Empty/nil when the server is older or has no data:
+	// an unknown cost is never reported as 0.
+	AccountID          string   `json:"account_id,omitempty"`
+	AccountAlias       string   `json:"account_alias,omitempty"`
+	CostStatus         string   `json:"cost_status,omitempty"`
+	CostDetail         string   `json:"cost_detail,omitempty"`
+	CostCoverageUSD    *float64 `json:"cost_coverage_usd,omitempty"`
+	CostAccountMonthly *float64 `json:"cost_account_monthly,omitempty"`
+	CostMatchedMonthly *float64 `json:"cost_matched_monthly,omitempty"`
+}
+
+// AccountRef is a connected AWS account as api.sofe.dev lists it in an account_required answer.
+type AccountRef struct {
+	AccountID string `json:"account_id"`
+	Alias     string `json:"alias"`
+}
+
+// APIError is an error answer (HTTP >= 400) from the API. Error() keeps the original
+// "API error <status>: <body>" format, so callers that print it see no change.
+type APIError struct {
+	Status   int
+	Code     string       // the "error" field of the JSON body, when there is one
+	Message  string       // the "message" field, when there is one
+	Accounts []AccountRef // set on 400 account_required
+	Body     string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("API error %d: %s", e.Status, e.Body)
+}
+
+func newAPIError(status int, body []byte) *APIError {
+	e := &APIError{Status: status, Body: string(body)}
+	var parsed struct {
+		Error    string       `json:"error"`
+		Message  string       `json:"message"`
+		Accounts []AccountRef `json:"accounts"`
+	}
+	// A body that is not JSON (an HTML gateway error, for example) simply leaves the fields empty.
+	if json.Unmarshal(body, &parsed) == nil {
+		e.Code, e.Message, e.Accounts = parsed.Error, parsed.Message, parsed.Accounts
+	}
+	return e
 }
 
 type PolicySummary struct {
@@ -89,7 +136,7 @@ func (c *Client) do(method, path string, body interface{}) ([]byte, error) {
 
 	data, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, string(data))
+		return nil, newAPIError(resp.StatusCode, data)
 	}
 	return data, nil
 }

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -20,6 +21,7 @@ var (
 	autoServe     bool
 	cloudMode     bool
 	apiKeyFlag    string
+	accountFlag   string
 )
 
 var (
@@ -80,6 +82,13 @@ func renderSummaryCard(resp *client.EvaluateResponse) string {
 	b.WriteString(summaryLabel.Render("Severity:") + summaryValue.Render(
 		fmt.Sprintf("%d high • %d medium • %d low", high, med, low)) + "\n")
 
+	if line := accountLine(resp); line != "" {
+		b.WriteString(summaryLabel.Render("Account:") + summaryValue.Render(line) + "\n")
+	}
+	if line := costLine(resp); line != "" {
+		b.WriteString(summaryLabel.Render("Cost:") + summaryValue.Render(line) + "\n")
+	}
+
 	if resp.TotalEstimatedSavings > 0 {
 		b.WriteString(summaryLabel.Render("Savings:") + summaryValue.Render(
 			fmt.Sprintf("$%.0f/mo", resp.TotalEstimatedSavings)) + "\n")
@@ -111,8 +120,22 @@ var evaluateCmd = &cobra.Command{
 		// Determine mode: --cloud flag > config mode
 		useCloud := cloudMode || cfg.Mode == "cloud"
 
+		if accountFlag != "" {
+			if !useCloud {
+				output.PrintError("--account only applies to cloud mode. Add --cloud, or use --profile for a local evaluation.")
+				os.Exit(1)
+			}
+			if !validAccountID(accountFlag) {
+				output.PrintError(fmt.Sprintf("--account must be a 12-digit AWS account ID (got %q)", accountFlag))
+				os.Exit(1)
+			}
+		}
+
 		if useCloud {
-			// Cloud mode resolves the AWS account server-side (connected account / Lambda role).
+			// Arguments are valid from here on: a failure is a runtime error, not a usage mistake,
+			// so cobra must not dump the flag list after the message that explains it.
+			cmd.SilenceUsage = true
+			// Cloud mode evaluates a connected AWS account chosen server-side, or the one given with --account.
 			// The local AWS profile is meaningless to the API — sending it causes ProfileNotFound.
 			return evaluateCloud(dir, "")
 		}
@@ -144,12 +167,21 @@ func evaluateCloud(dir, prof string) error {
 		Profile:       prof,
 		ResourceTypes: resourceTypes,
 		FailOn:        failOn,
+		AccountID:     accountFlag,
 	})
 
 	elapsed := time.Since(start)
 
 	if err != nil {
 		clearLine()
+		var apiErr *client.APIError
+		if errors.As(err, &apiErr) {
+			// The API answered: say what it said and what to do, not "connection failed".
+			printStep(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("✗"), "Evaluation failed")
+			fmt.Println()
+			output.PrintError(describeCloudError(apiErr))
+			return err
+		}
 		printStep(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("✗"), "Connection failed")
 		fmt.Println()
 		output.PrintError(err.Error())
@@ -254,5 +286,6 @@ func init() {
 	evaluateCmd.Flags().BoolVar(&autoServe, "auto-serve", false, "Auto-start server if not running (stops after evaluation)")
 	evaluateCmd.Flags().BoolVar(&cloudMode, "cloud", false, "Use cloud API (api.sofe.dev) instead of local server")
 	evaluateCmd.Flags().StringVar(&apiKeyFlag, "api-key", "", "API key for cloud mode (sk_sofe_xxx)")
+	evaluateCmd.Flags().StringVar(&accountFlag, "account", "", "AWS account ID to evaluate in cloud mode (needed when several accounts are connected)")
 	rootCmd.AddCommand(evaluateCmd)
 }

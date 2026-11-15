@@ -75,7 +75,12 @@ sofe evaluate --cloud
 
 # Or pass key directly
 sofe evaluate --cloud --api-key sk_sofe_xxx
+
+# Several AWS accounts connected? Choose which one to evaluate
+sofe evaluate --cloud --account 123456789012
 ```
+
+With more than one connected account, `sofe evaluate --cloud` without `--account` lists them and asks you to choose.
 
 ## Commands
 
@@ -150,6 +155,7 @@ sofe status                     # Check your status
 |------|-------------|
 | `--cloud` | Use cloud API instead of local server |
 | `--api-key` | API key for cloud mode |
+| `--account` | AWS account ID (12 digits) to evaluate in cloud mode. Required when several accounts are connected |
 | `--profile` | AWS profile (local mode) |
 | `--policies` | Policies directory |
 | `--fail-on` | Exit 1 if findings at/above severity |
