@@ -128,3 +128,30 @@ func TestJSONOutputOmitsUnknownCostFields(t *testing.T) {
 		t.Fatalf("unknown cost leaked into JSON: %s", raw)
 	}
 }
+
+func TestReportStackVersionPostsToTheAccountPath(t *testing.T) {
+	var path string
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &body)
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	c := New(srv.URL, "sk_sofe_test")
+	if err := c.ReportStackVersion("abc12345", "2.3"); err != nil {
+		t.Fatal(err)
+	}
+	if path != "/connect/accounts/abc12345/stack-version" {
+		t.Fatalf("path = %q", path)
+	}
+	if body["template_version"] != "2.3" {
+		t.Fatalf("body = %v", body)
+	}
+	if err := c.ReportStackVersion("", "2.3"); err != nil {
+		t.Fatalf("empty connection id must be a no-op: %v", err)
+	}
+}

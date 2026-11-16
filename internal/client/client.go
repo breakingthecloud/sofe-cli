@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -34,25 +35,25 @@ type EvaluateRequest struct {
 }
 
 type Finding struct {
-	PolicyName      string   `json:"policy_name"`
-	Severity        string   `json:"severity"`
-	ResourceID      string   `json:"resource_id"`
-	ResourceType    string   `json:"resource_type"`
-	Region          string   `json:"region"`
-	Message         string   `json:"message"`
+	PolicyName       string   `json:"policy_name"`
+	Severity         string   `json:"severity"`
+	ResourceID       string   `json:"resource_id"`
+	ResourceType     string   `json:"resource_type"`
+	Region           string   `json:"region"`
+	Message          string   `json:"message"`
 	EstimatedSavings *float64 `json:"estimated_savings"`
-	Recommendation  *string  `json:"recommendation"`
+	Recommendation   *string  `json:"recommendation"`
 }
 
 type EvaluateResponse struct {
-	EvaluationID         string    `json:"evaluation_id"`
-	Timestamp            string    `json:"timestamp"`
-	PoliciesEvaluated    int       `json:"policies_evaluated"`
-	ResourcesScanned     int       `json:"resources_scanned"`
-	FindingsCount        int       `json:"findings_count"`
-	TotalEstimatedSavings float64  `json:"total_estimated_savings"`
-	Failed               bool      `json:"failed"`
-	Findings             []Finding `json:"findings"`
+	EvaluationID          string    `json:"evaluation_id"`
+	Timestamp             string    `json:"timestamp"`
+	PoliciesEvaluated     int       `json:"policies_evaluated"`
+	ResourcesScanned      int       `json:"resources_scanned"`
+	FindingsCount         int       `json:"findings_count"`
+	TotalEstimatedSavings float64   `json:"total_estimated_savings"`
+	Failed                bool      `json:"failed"`
+	Findings              []Finding `json:"findings"`
 
 	// Account and cost data (api.sofe.dev, S111). Empty/nil when the server is older or has no data:
 	// an unknown cost is never reported as 0.
@@ -149,6 +150,16 @@ func (c *Client) Get(path string) ([]byte, error) {
 // Post performs a POST request with the given body and returns raw bytes
 func (c *Client) Post(path string, body interface{}) ([]byte, error) {
 	return c.do("POST", path, body)
+}
+
+// ReportStackVersion tells the platform which TemplateVersion the local AWS CLI verified for a
+// connected account. connectionID is the Firestore document id returned by GET /connect/accounts.
+func (c *Client) ReportStackVersion(connectionID, version string) error {
+	if connectionID == "" || version == "" {
+		return nil
+	}
+	_, err := c.Post("/connect/accounts/"+url.PathEscape(connectionID)+"/stack-version", map[string]string{"template_version": version})
+	return err
 }
 
 func (c *Client) Health() (*HealthResponse, error) {

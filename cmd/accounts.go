@@ -271,6 +271,7 @@ func runAccountsUpdate(_ *cobra.Command, _ []string) error {
 		out, runErr := runAws(updateStackArgs(p.profile, region, stackName, cfn.TemplateURL)...)
 		if runErr != nil {
 			if strings.Contains(strings.ToLower(out), "no updates are to be performed") {
+				reportStackVersion(p.account.ID, before)
 				fmt.Printf("✓ %s (%s): already current (TemplateVersion %s)\n", p.account.Alias, p.account.AccountID, orDash(before))
 				continue
 			}
@@ -284,6 +285,7 @@ func runAccountsUpdate(_ *cobra.Command, _ []string) error {
 			continue
 		}
 		after := stackTemplateVersion(p.profile, region, stackName)
+		reportStackVersion(p.account.ID, after)
 		fmt.Printf("✓ %s (%s): TemplateVersion %s → %s\n", p.account.Alias, p.account.AccountID, orDash(before), orDash(after))
 	}
 
@@ -292,6 +294,15 @@ func runAccountsUpdate(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("%d stack update(s) failed", failed)
 	}
 	return nil
+}
+
+func reportStackVersion(connectionID, version string) {
+	if version == "" {
+		return
+	}
+	if err := getCloudClient().ReportStackVersion(connectionID, version); err != nil {
+		fmt.Printf("  (could not report TemplateVersion to the platform: %v)\n", err)
+	}
 }
 
 func printMissingProfiles(missing []cloudAccount, stackName, region, templateUrl string) {
