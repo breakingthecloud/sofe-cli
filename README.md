@@ -122,6 +122,29 @@ evaluation and tell you which one (and which others exist). Pass `--account <id>
 | `sofe upgrade` | Connect to SOFE Cloud or upgrade to Pro |
 | `sofe status` | Show account status (tier, evals, AI usage) |
 | `sofe config` | Manage configuration (set/show) |
+| `sofe accounts list` | Connected accounts and their stack TemplateVersion (cloud mode) |
+| `sofe accounts update` | Update the SOFE role stack in every connected account |
+
+### Update connected account stacks
+
+The SaaS cannot update your CloudFormation stack: the SOFE role is read-only by design. In cloud mode the CLI
+does it locally with your own credentials, mapping each connected account to an AWS profile
+(`aws configure list-profiles` + `sts get-caller-identity`) and skipping stacks already on the current template:
+
+```bash
+sofe accounts list                 # shows the real TemplateVersion per account (v2.3, v2.2, ...)
+sofe accounts update --dry-run     # prints the profile mapping and the exact aws commands
+sofe accounts update               # asks once, then updates each stack and waits for UPDATE_COMPLETE
+```
+
+If the automatic mapping is not what you want:
+
+```bash
+sofe accounts update --profile-map 111111111111=prod,222222222222=dev
+```
+
+The update keeps each stack's External ID (`UsePreviousValue=true`), so connected accounts keep working and
+nothing has to be reconnected.
 
 ### Utilities
 
